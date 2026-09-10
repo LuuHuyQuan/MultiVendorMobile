@@ -187,7 +187,7 @@ export function ProductCard({
             style={styles.productImage}
           />
         </Pressable>
-        <View pointerEvents="none" style={styles.discountBadge}>
+        <View style={[styles.discountBadge, styles.pointerEventsNone]}>
           <Text style={styles.discountText}>{product.discount}% OFF</Text>
         </View>
         <Pressable
@@ -416,6 +416,7 @@ export const sharedStyles = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  pointerEventsNone: { pointerEvents: 'none' },
   pressed: { opacity: 0.7 },
   header: {
     minHeight: 72,
@@ -508,10 +509,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: 18,
     backgroundColor: COLORS.white,
-    shadowColor: '#17423E',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: 5 },
-    shadowRadius: 10,
+    boxShadow: '0px 5px 10px rgba(23, 66, 62, 0.06)',
     elevation: 2,
   },
   productCardWide: { width: 235 },
@@ -608,10 +606,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     backgroundColor: COLORS.white,
-    shadowColor: '#163E3B',
-    shadowOpacity: 0.06,
-    shadowOffset: { width: 0, height: -3 },
-    shadowRadius: 8,
+    boxShadow: '0px -3px 8px rgba(22, 62, 59, 0.06)',
     elevation: 10,
   },
   navItem: {

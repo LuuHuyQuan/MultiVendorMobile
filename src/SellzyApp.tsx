@@ -443,10 +443,10 @@ export default function SellzyApp() {
       ) : null}
       {toast ? (
         <View
-          pointerEvents="none"
           accessibilityLiveRegion="polite"
           style={[
             styles.toast,
+            styles.pointerEventsNone,
             { bottom: showBottomNav ? 78 + insets.bottom : 22 + insets.bottom },
           ]}
         >
@@ -458,6 +458,7 @@ export default function SellzyApp() {
 }
 
 const styles = StyleSheet.create({
+  pointerEventsNone: { pointerEvents: 'none' },
   app: { flex: 1, backgroundColor: COLORS.white },
   route: { flex: 1 },
   loading: {
