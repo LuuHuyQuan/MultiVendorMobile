@@ -1,575 +1,457 @@
-import React, {useMemo, useState} from 'react';
+import React, { useState } from 'react';
 import {
-  Dimensions,
   Image,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
-import {useSafeAreaInsets} from 'react-native-safe-area-context';
 
-const COLORS = {
-  teal: '#078B81',
-  darkTeal: '#075D63',
-  yellow: '#FFC928',
-  red: '#D91F52',
-  ink: '#20272D',
-  muted: '#7A8389',
-  border: '#E7EBEA',
-  surface: '#F6F8F7',
-  white: '#FFFFFF',
+import { ProductCard, SearchBar } from '../components/SellzyUI';
+import { Icon, IconName } from '../components/Icon';
+import { categories, products, sellers } from '../data/catalog';
+import { COLORS } from '../theme';
+
+type Props = {
+  topInset: number;
+  cartCount: number;
+  wishlistIds: string[];
+  onShop: (
+    category?: string,
+    query?: string,
+    sort?: 'popular' | 'price' | 'price-desc' | 'discount',
+  ) => void;
+  onCart: () => void;
+  onOpenProduct: (id: string) => void;
+  onAdd: (id: string) => void;
+  onToggleLike: (id: string) => void;
+  onSellers: () => void;
 };
 
-const LOGO = 'https://sellzy-html.vercel.app/assets/images/logo.png';
-const SCREEN_WIDTH = Dimensions.get('window').width;
-const PRODUCT_CARD_WIDTH = Math.min(268, SCREEN_WIDTH - 52);
-
-type Product = {
-  id: string;
-  name: string;
-  image: string;
-  price: string;
-  oldPrice: string;
-  discount: string;
-  reviews: number;
-  store: string;
+const LOGO = require('../assets/logo.png');
+const categoryIcons: Record<string, IconName> = {
+  Vitamins: 'bottle',
+  'Personal Care': 'shield',
+  Wellness: 'heart',
+  Devices: 'activity',
+  Nutrition: 'leaf',
 };
-
-type Category = {
-  id: string;
-  label: string;
-  image: string;
-  tint: string;
-};
-
-const categories: Category[] = [
-  {
-    id: 'personal-care',
-    label: 'Personal Care',
-    image: 'https://sellzy-html.vercel.app/assets/images/hand-sanitizer-1.png',
-    tint: '#E6F7F4',
-  },
-  {
-    id: 'nutrition',
-    label: 'Nutrition',
-    image: 'https://sellzy-html.vercel.app/assets/images/vitamin-c.png',
-    tint: '#FFF7DC',
-  },
-  {
-    id: 'wellness',
-    label: 'Wellness',
-    image: 'https://sellzy-html.vercel.app/assets/images/aooca.png',
-    tint: '#F2ECFF',
-  },
-  {
-    id: 'devices',
-    label: 'Devices',
-    image: 'https://sellzy-html.vercel.app/assets/images/temperature-gun-2.png',
-    tint: '#E9F2FF',
-  },
-  {
-    id: 'skincare',
-    label: 'Skincare',
-    image: 'https://sellzy-html.vercel.app/assets/images/combat.png',
-    tint: '#FFEFEF',
-  },
+const benefits: { icon: IconName; title: string; text: string }[] = [
+  { icon: 'truck', title: 'Free Shipping', text: 'On orders over $35' },
+  { icon: 'heart', title: 'Saved Favorites', text: 'Keep your picks close' },
+  { icon: 'package', title: 'Your Orders', text: 'Everything in one place' },
+  { icon: 'credit-card', title: 'Easy Checkout', text: 'Cash on delivery' },
 ];
 
-const products: Product[] = [
-  {
-    id: 'vitamin-c',
-    name: 'VitaLife Vitamin C 1000mg Immunity Support',
-    image: 'https://sellzy-html.vercel.app/assets/images/vitamin-c.png',
-    price: '$27.49',
-    oldPrice: '$39.99',
-    discount: '15% OFF',
-    reviews: 189,
-    store: 'VitaLife Store',
-  },
-  {
-    id: 'kids-vitamins',
-    name: "Renzo's Vitamins for Kids — Bright & Healthy",
-    image: 'https://sellzy-html.vercel.app/assets/images/vitamin-c-2.png',
-    price: '$18.90',
-    oldPrice: '$24.99',
-    discount: '10% OFF',
-    reviews: 124,
-    store: 'Family Health',
-  },
-  {
-    id: 'apple-juice',
-    name: 'Organic Apple Juice Daily Wellness Pack',
-    image: 'https://sellzy-html.vercel.app/assets/images/apple-juice.png',
-    price: '$12.40',
-    oldPrice: '$16.50',
-    discount: '12% OFF',
-    reviews: 98,
-    store: 'Natural Choice',
-  },
-  {
-    id: 'temperature-gun',
-    name: 'Digital Infrared Thermometer — Instant Read',
-    image: 'https://sellzy-html.vercel.app/assets/images/temperature-gun-2.png',
-    price: '$34.20',
-    oldPrice: '$42.00',
-    discount: '18% OFF',
-    reviews: 211,
-    store: 'Care Devices',
-  },
-];
+export default function HomeScreen({
+  topInset,
+  cartCount,
+  wishlistIds,
+  onShop,
+  onCart,
+  onOpenProduct,
+  onAdd,
+  onToggleLike,
+  onSellers,
+}: Props) {
+  const [query, setQuery] = useState('');
 
-const features = [
-  {icon: '↗', title: 'Free Shipping', subtitle: 'On every order'},
-  {icon: '24/7', title: '24x7 Support', subtitle: 'Always here to help'},
-  {icon: '↺', title: '30 Days Return', subtitle: 'Shop with confidence'},
-  {icon: '✓', title: 'Secure Payment', subtitle: 'Safe & protected'},
-];
-
-type ProductCardProps = {
-  product: Product;
-  liked: boolean;
-  onAdd: () => void;
-  onToggleLiked: () => void;
-};
-
-function ProductCard({product, liked, onAdd, onToggleLiked}: ProductCardProps) {
   return (
-    <View style={styles.productCard}>
-      <View style={styles.productImageWrap}>
-        <Image
-          accessibilityLabel={product.name}
-          source={{uri: product.image}}
-          style={styles.productImage}
-          resizeMode="contain"
-        />
-        <View style={styles.discountBadge}>
-          <Text style={styles.discountText}>{product.discount}</Text>
+    <ScrollView
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      showsVerticalScrollIndicator={false}
+    >
+      <View
+        style={[
+          styles.promo,
+          { paddingTop: topInset, minHeight: 42 + topInset },
+        ]}
+      >
+        <Icon name="leaf" size={14} color={COLORS.white} />
+        <Text style={styles.promoText}>Wellness essentials</Text>
+        <View style={styles.promoBadge}>
+          <Text style={styles.promoBadgeText}>UP TO 31% OFF</Text>
         </View>
+      </View>
+
+      <View style={styles.header}>
         <Pressable
-          accessibilityLabel={liked ? 'Remove from wishlist' : 'Add to wishlist'}
+          accessibilityLabel="Browse sellers"
           accessibilityRole="button"
-          onPress={onToggleLiked}
-          style={({pressed}) => [styles.floatingHeart, pressed && styles.pressed]}>
-          <Text style={[styles.heartText, liked && styles.heartTextActive]}>
-            {liked ? '♥' : '♡'}
-          </Text>
+          testID="home-sellers"
+          onPress={onSellers}
+          style={styles.menuButton}
+        >
+          <Icon name="menu" />
+        </Pressable>
+        <Image
+          accessibilityLabel="Sellzy"
+          source={LOGO}
+          resizeMode="contain"
+          style={styles.logo}
+        />
+        <Pressable
+          accessibilityLabel={`${cartCount} items in cart`}
+          accessibilityRole="button"
+          testID="header-cart"
+          onPress={onCart}
+          style={styles.cartButton}
+        >
+          <Icon name="cart" />
+          {cartCount ? (
+            <View style={styles.cartBadge}>
+              <Text style={styles.cartBadgeText}>
+                {cartCount > 9 ? '9+' : cartCount}
+              </Text>
+            </View>
+          ) : null}
         </Pressable>
       </View>
 
-      <Text style={styles.storeLabel}>{product.store}</Text>
-      <Text numberOfLines={2} style={styles.productName}>
-        {product.name}
-      </Text>
-      <View style={styles.ratingRow}>
-        <Text style={styles.stars}>★★★★★</Text>
-        <Text style={styles.reviewText}>({product.reviews})</Text>
+      <SearchBar
+        onChangeText={setQuery}
+        onSubmit={() => onShop(undefined, query.trim())}
+        placeholder="Search for the items"
+        value={query}
+      />
+
+      <View style={styles.hero}>
+        <View style={styles.heroOfferRow}>
+          <Text style={styles.heroEyebrow}>EXCLUSIVE OFFER</Text>
+          <View style={styles.heroBadge}>
+            <Text style={styles.heroBadgeText}>UP TO 31% OFF</Text>
+          </View>
+        </View>
+        <Text style={styles.heroTitle}>
+          Everything you need for wellness in one place.
+        </Text>
+        <Text style={styles.heroText}>
+          Discover trusted brands, everyday essentials and exclusive deals.
+        </Text>
+        <View style={styles.heroBottom}>
+          <Pressable
+            accessibilityRole="button"
+            testID="home-shop-now"
+            onPress={() => onShop()}
+            style={({ pressed }) => [
+              styles.heroButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.heroButtonText}>Shop Now</Text>
+            <View style={styles.heroArrowWrap}>
+              <Icon name="arrow-up-right" size={18} color={COLORS.teal} />
+            </View>
+          </Pressable>
+          <View style={styles.heroVisual}>
+            <View style={styles.heroCircle} />
+            <Image
+              source={require('../assets/vitamin-c.png')}
+              resizeMode="contain"
+              style={styles.heroImage}
+            />
+          </View>
+        </View>
       </View>
-      <View style={styles.priceRow}>
-        <Text style={styles.price}>{product.price}</Text>
-        <Text style={styles.oldPrice}>{product.oldPrice}</Text>
+
+      <ScrollView
+        contentContainerStyle={styles.benefits}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {benefits.map(item => (
+          <View key={item.title} style={styles.benefitCard}>
+            <View style={styles.benefitIconWrap}>
+              <Icon name={item.icon} size={20} color={COLORS.tealDark} />
+            </View>
+            <Text style={styles.benefitTitle}>{item.title}</Text>
+            <Text style={styles.benefitText}>{item.text}</Text>
+          </View>
+        ))}
+      </ScrollView>
+
+      <SectionHeading
+        action="View All"
+        onAction={() => onShop()}
+        subtitle="Find your daily essentials"
+        title="Shop by Category"
+      />
+      <ScrollView
+        contentContainerStyle={styles.categoryList}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {categories.slice(1).map(category => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Shop ${category.label}`}
+            testID={`home-category-${category.id}`}
+            key={category.id}
+            onPress={() => onShop(category.id)}
+            style={({ pressed }) => [
+              styles.category,
+              pressed && styles.pressed,
+            ]}
+          >
+            <View
+              style={[styles.categoryIcon, { backgroundColor: category.tint }]}
+            >
+              <Icon
+                name={categoryIcons[category.id] ?? 'shop'}
+                size={27}
+                color={COLORS.tealDark}
+              />
+            </View>
+            <Text numberOfLines={2} style={styles.categoryLabel}>
+              {category.label}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <SectionHeading
+        action="View All"
+        onAction={() => onShop(undefined, undefined, 'discount')}
+        subtitle="Limited-time offers on wellness favorites"
+        title="Daily Discount You'll Love"
+      />
+      <ScrollView
+        contentContainerStyle={styles.productList}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {[...products]
+          .sort((a, b) => b.discount - a.discount)
+          .slice(0, 6)
+          .map(product => (
+            <ProductCard
+              key={product.id}
+              liked={wishlistIds.includes(product.id)}
+              onAdd={() => onAdd(product.id)}
+              onOpen={() => onOpenProduct(product.id)}
+              onToggleLike={() => onToggleLike(product.id)}
+              product={product}
+            />
+          ))}
+      </ScrollView>
+
+      <View style={styles.dealBanner}>
+        <Text style={styles.dealEyebrow}>LIMITED TIME OFFER</Text>
+        <Text style={styles.dealTitle}>Hot Deals This Week</Text>
+        <Text style={styles.dealText}>
+          Save more on vitamins, skincare and health essentials.
+        </Text>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => onShop(undefined, undefined, 'discount')}
+          style={styles.dealButton}
+        >
+          <Text style={styles.dealButtonText}>Explore Deals</Text>
+          <Icon name="arrow-right" color="#4E3E00" size={15} />
+        </Pressable>
+        <Image
+          source={require('../assets/vitamin-c-2.png')}
+          resizeMode="contain"
+          style={styles.dealImage}
+        />
+      </View>
+
+      <SectionHeading
+        action="Meet Sellers"
+        onAction={onSellers}
+        subtitle="Curated stores, quality checked"
+        title="Trusted Marketplace"
+      />
+      <View style={styles.sellerPreview}>
+        {sellers.slice(0, 3).map((seller, index) => (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`Meet ${seller.name}`}
+            onPress={onSellers}
+            key={seller.name}
+            style={styles.sellerMini}
+          >
+            <View
+              style={[
+                styles.sellerAvatar,
+                index === 1 && styles.sellerAvatarYellow,
+              ]}
+            >
+              <Text style={styles.sellerAvatarText}>
+                {seller.name.charAt(0)}
+              </Text>
+            </View>
+            <Text numberOfLines={1} style={styles.sellerName}>
+              {seller.name}
+            </Text>
+            <View style={styles.sellerRatingRow}>
+              <Icon name="star" filled size={10} color={COLORS.orange} />
+              <Text style={styles.sellerRating}>
+                {seller.rating.toFixed(1)}
+              </Text>
+            </View>
+          </Pressable>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+function SectionHeading({
+  title,
+  subtitle,
+  action,
+  onAction,
+}: {
+  title: string;
+  subtitle: string;
+  action: string;
+  onAction: () => void;
+}) {
+  return (
+    <View style={styles.sectionHeading}>
+      <View style={styles.sectionCopy}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <Text style={styles.sectionSubtitle}>{subtitle}</Text>
       </View>
       <Pressable
-        accessibilityLabel={`Add ${product.name} to cart`}
         accessibilityRole="button"
-        onPress={onAdd}
-        style={({pressed}) => [styles.addButton, pressed && styles.addButtonPressed]}>
-        <Text style={styles.addButtonIcon}>＋</Text>
-        <Text style={styles.addButtonText}>Add to Cart</Text>
+        accessibilityLabel={`${action}: ${title}`}
+        style={styles.sectionAction}
+        onPress={onAction}
+      >
+        <Text style={styles.viewAll}>{action}</Text>
       </Pressable>
     </View>
   );
 }
 
-function HomeScreen() {
-  const insets = useSafeAreaInsets();
-  const [query, setQuery] = useState('');
-  const [cartCount, setCartCount] = useState(0);
-  const [likedIds, setLikedIds] = useState<string[]>([]);
-
-  const filteredProducts = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase();
-    if (!normalizedQuery) {
-      return products;
-    }
-
-    return products.filter(product =>
-      `${product.name} ${product.store}`.toLowerCase().includes(normalizedQuery),
-    );
-  }, [query]);
-
-  const toggleLiked = (productId: string) => {
-    setLikedIds(current =>
-      current.includes(productId)
-        ? current.filter(id => id !== productId)
-        : [...current, productId],
-    );
-  };
-
-  return (
-    <View style={styles.screen}>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}>
-        <View
-          style={[
-            styles.promoBar,
-            {minHeight: 42 + insets.top, paddingTop: insets.top},
-          ]}>
-          <Text style={styles.promoSpark}>✣</Text>
-          <Text style={styles.promoText}>Fashion Category</Text>
-          <View style={styles.promoBadge}>
-            <Text style={styles.promoBadgeText}>25% OFF</Text>
-          </View>
-          <Text style={styles.promoText}>Today</Text>
-        </View>
-
-        <View style={styles.header}>
-          <Pressable
-            accessibilityLabel="Open menu"
-            accessibilityRole="button"
-            style={({pressed}) => [styles.circleButton, pressed && styles.pressed]}>
-            <Text style={styles.menuIcon}>☰</Text>
-          </Pressable>
-
-          <Image
-            accessibilityLabel="Sellzy"
-            source={{uri: LOGO}}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-
-          <Pressable
-            accessibilityLabel={`${cartCount} items in cart`}
-            accessibilityRole="button"
-            style={({pressed}) => [styles.cartButton, pressed && styles.pressed]}>
-            <Text style={styles.cartIcon}>⌑</Text>
-            {cartCount > 0 && (
-              <View style={styles.cartCountBubble}>
-                <Text style={styles.cartCountText}>{cartCount}</Text>
-              </View>
-            )}
-          </Pressable>
-        </View>
-
-        <View style={styles.searchWrap}>
-          <TextInput
-            accessibilityLabel="Search products"
-            onChangeText={setQuery}
-            placeholder="Search for the Items"
-            placeholderTextColor="#9AA2A7"
-            returnKeyType="search"
-            style={styles.searchInput}
-            value={query}
-          />
-          <Text style={styles.searchIcon}>⌕</Text>
-        </View>
-
-        <View style={styles.hero}>
-          <View style={styles.offerRow}>
-            <Text style={styles.offerLabel}>Exclusive offer</Text>
-            <View style={styles.heroBadge}>
-              <Text style={styles.heroBadgeText}>25% OFF</Text>
-            </View>
-          </View>
-          <Text style={styles.heroTitle}>
-            Everything you need for wellness in one place.
-          </Text>
-          <Text style={styles.heroSubtitle}>
-            Discover your favorite brands, latest trends, and exclusive
-            discounts in one place.
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            style={({pressed}) => [styles.heroButton, pressed && styles.heroButtonPressed]}>
-            <Text style={styles.heroButtonText}>Shop Now</Text>
-            <View style={styles.heroArrowCircle}>
-              <Text style={styles.heroArrow}>↗</Text>
-            </View>
-          </Pressable>
-          <View style={styles.heroDots}>
-            <View style={[styles.heroDot, styles.heroDotActive]} />
-            <View style={styles.heroDot} />
-            <View style={styles.heroDot} />
-            <View style={styles.heroDot} />
-          </View>
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.featureList}
-          horizontal
-          showsHorizontalScrollIndicator={false}>
-          {features.map(feature => (
-            <View key={feature.title} style={styles.featureCard}>
-              <View style={styles.featureIconCircle}>
-                <Text style={styles.featureIcon}>{feature.icon}</Text>
-              </View>
-              <Text style={styles.featureTitle}>{feature.title}</Text>
-              <Text style={styles.featureSubtitle}>{feature.subtitle}</Text>
-            </View>
-          ))}
-        </ScrollView>
-
-        <View style={styles.sectionHeader}>
-          <View>
-            <Text style={styles.sectionTitle}>Shop by Category</Text>
-            <Text style={styles.sectionSubtitle}>Find your daily essentials</Text>
-          </View>
-          <Pressable accessibilityRole="button">
-            <Text style={styles.viewAll}>View All</Text>
-          </Pressable>
-        </View>
-
-        <ScrollView
-          contentContainerStyle={styles.categoryList}
-          horizontal
-          showsHorizontalScrollIndicator={false}>
-          {categories.map(category => (
-            <Pressable
-              accessibilityRole="button"
-              key={category.id}
-              style={({pressed}) => [styles.categoryItem, pressed && styles.pressed]}>
-              <View style={[styles.categoryImageWrap, {backgroundColor: category.tint}]}>
-                <Image
-                  accessibilityLabel={category.label}
-                  source={{uri: category.image}}
-                  style={styles.categoryImage}
-                  resizeMode="contain"
-                />
-              </View>
-              <Text numberOfLines={2} style={styles.categoryLabel}>
-                {category.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        <View style={styles.sectionHeader}>
-          <View style={styles.discountHeadingWrap}>
-            <Text style={styles.sectionTitle}>Daily Discount You'll Love</Text>
-            <Text style={styles.sectionSubtitle}>
-              Limited-time offers on wellness favorites
-            </Text>
-          </View>
-          <Pressable accessibilityRole="button">
-            <Text style={styles.viewAll}>View All</Text>
-          </Pressable>
-        </View>
-
-        {filteredProducts.length > 0 ? (
-          <ScrollView
-            contentContainerStyle={styles.productList}
-            horizontal
-            showsHorizontalScrollIndicator={false}>
-            {filteredProducts.map(product => (
-              <ProductCard
-                key={product.id}
-                liked={likedIds.includes(product.id)}
-                onAdd={() => setCartCount(count => count + 1)}
-                onToggleLiked={() => toggleLiked(product.id)}
-                product={product}
-              />
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateTitle}>No products found</Text>
-            <Text style={styles.emptyStateText}>
-              Try another product or store name.
-            </Text>
-          </View>
-        )}
-
-        <View style={styles.dealBanner}>
-          <View style={styles.dealContent}>
-            <Text style={styles.dealEyebrow}>LIMITED TIME OFFER</Text>
-            <Text style={styles.dealTitle}>Hot Deals This Week</Text>
-            <Text style={styles.dealText}>
-              Save more on vitamins, skincare and everyday health essentials.
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              style={({pressed}) => [styles.dealButton, pressed && styles.pressed]}>
-              <Text style={styles.dealButtonText}>Explore Deals  →</Text>
-            </Pressable>
-          </View>
-          <Image
-            accessibilityLabel="Vitamin C product"
-            source={{uri: 'https://sellzy-html.vercel.app/assets/images/vitamin-c.png'}}
-            style={styles.dealImage}
-            resizeMode="contain"
-          />
-        </View>
-      </ScrollView>
-
-      <View style={[styles.bottomNav, {paddingBottom: Math.max(insets.bottom, 8)}]}>
-        <Pressable accessibilityRole="button" style={styles.navItem}>
-          <Text style={[styles.navIcon, styles.navIconActive]}>⌂</Text>
-          <Text style={[styles.navLabel, styles.navLabelActive]}>Home</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" style={styles.navItem}>
-          <Text style={styles.navIcon}>▣</Text>
-          <Text style={styles.navLabel}>My Order</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" style={styles.navItem}>
-          <Text style={styles.navIcon}>♡</Text>
-          <Text style={styles.navLabel}>Wishlist</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" style={styles.navItem}>
-          <Text style={styles.navIcon}>○</Text>
-          <Text style={styles.navLabel}>My Account</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  screen: {flex: 1, backgroundColor: COLORS.white},
-  scrollContent: {paddingBottom: 28},
-  promoBar: {
-    minHeight: 42,
-    paddingHorizontal: 18,
+  content: {
+    paddingBottom: 34,
+    backgroundColor: COLORS.white,
+    width: '100%',
+    maxWidth: 800,
+    alignSelf: 'center',
+  },
+  pressed: { opacity: 0.72 },
+  promo: {
+    paddingHorizontal: 14,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
+    gap: 7,
     backgroundColor: COLORS.teal,
-    gap: 8,
   },
-  promoSpark: {color: COLORS.white, fontSize: 16},
-  promoText: {color: COLORS.white, fontSize: 12, fontWeight: '600'},
+  promoText: { color: COLORS.white, fontSize: 11, fontWeight: '700' },
   promoBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     backgroundColor: COLORS.yellow,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
   },
-  promoBadgeText: {color: '#715600', fontSize: 10, fontWeight: '800'},
+  promoBadgeText: { color: '#604900', fontSize: 9, fontWeight: '900' },
   header: {
-    height: 78,
+    height: 72,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  circleButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  menuButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: COLORS.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.white,
   },
-  menuIcon: {color: COLORS.ink, fontSize: 22, lineHeight: 26},
-  logo: {width: 118, height: 40},
+  logo: { width: 112, height: 38 },
   cartButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: COLORS.yellow,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.yellow,
   },
-  cartIcon: {
-    color: COLORS.ink,
-    fontSize: 25,
-    transform: [{rotate: '12deg'}],
-  },
-  cartCountBubble: {
+  cartBadge: {
     position: 'absolute',
-    right: -3,
-    top: -3,
+    top: -4,
+    right: -4,
     minWidth: 20,
     height: 20,
     borderRadius: 10,
     paddingHorizontal: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: COLORS.red,
     borderWidth: 2,
     borderColor: COLORS.white,
-  },
-  cartCountText: {color: COLORS.white, fontSize: 10, fontWeight: '800'},
-  pressed: {opacity: 0.72},
-  searchWrap: {
-    height: 52,
-    marginHorizontal: 16,
-    marginBottom: 22,
-    borderRadius: 26,
-    borderWidth: 1,
-    borderColor: '#DDE2E0',
-    backgroundColor: COLORS.white,
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: 18,
-    paddingRight: 14,
+    justifyContent: 'center',
   },
-  searchInput: {
-    flex: 1,
-    color: COLORS.ink,
-    fontSize: 15,
-    paddingVertical: 0,
-  },
-  searchIcon: {
-    color: '#829098',
-    fontSize: 29,
-    lineHeight: 32,
-    transform: [{rotate: '-20deg'}],
-  },
+  cartBadgeText: { color: COLORS.white, fontSize: 9, fontWeight: '900' },
   hero: {
-    minHeight: 450,
     marginHorizontal: 16,
-    paddingHorizontal: 30,
-    paddingTop: 72,
-    paddingBottom: 24,
-    borderRadius: 26,
-    backgroundColor: COLORS.darkTeal,
+    marginTop: 5,
+    padding: 23,
+    paddingBottom: 15,
+    borderRadius: 25,
     overflow: 'hidden',
+    backgroundColor: COLORS.tealDark,
   },
-  offerRow: {flexDirection: 'row', alignItems: 'center', gap: 9},
-  offerLabel: {color: COLORS.white, fontSize: 14, fontWeight: '700'},
-  heroBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    backgroundColor: COLORS.yellow,
+  heroOfferRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 9,
+    zIndex: 2,
   },
-  heroBadgeText: {color: '#5D4800', fontSize: 10, fontWeight: '800'},
-  heroTitle: {
-    marginTop: 18,
+  heroEyebrow: {
     color: COLORS.white,
-    fontSize: 32,
-    lineHeight: 40,
-    letterSpacing: -0.7,
-    fontWeight: '800',
+    fontSize: 10,
+    letterSpacing: 1,
+    fontWeight: '900',
   },
-  heroSubtitle: {
-    marginTop: 16,
-    color: '#E7F4F2',
-    fontSize: 15,
-    lineHeight: 23,
-    fontWeight: '500',
+  heroBadge: {
+    backgroundColor: COLORS.yellow,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  heroBadgeText: { color: '#594500', fontSize: 9, fontWeight: '900' },
+  heroTitle: {
+    marginTop: 19,
+    color: COLORS.white,
+    fontSize: 30,
+    lineHeight: 37,
+    letterSpacing: -0.6,
+    fontWeight: '900',
+    zIndex: 2,
+  },
+  heroText: {
+    marginTop: 14,
+    color: '#D7EBE9',
+    fontSize: 13,
+    lineHeight: 20,
+    zIndex: 2,
   },
   heroButton: {
     alignSelf: 'flex-start',
-    marginTop: 25,
     height: 48,
-    paddingLeft: 20,
+    paddingLeft: 18,
     paddingRight: 7,
     borderRadius: 25,
-    backgroundColor: '#0B9E91',
+    backgroundColor: COLORS.teal,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 11,
+    zIndex: 2,
   },
-  heroButtonPressed: {transform: [{scale: 0.98}]},
-  heroButtonText: {color: COLORS.white, fontSize: 14, fontWeight: '800'},
-  heroArrowCircle: {
+  heroButtonText: { color: COLORS.white, fontSize: 13, fontWeight: '900' },
+  heroArrowWrap: {
     width: 34,
     height: 34,
     borderRadius: 17,
@@ -577,239 +459,196 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  heroArrow: {color: COLORS.teal, fontSize: 17, fontWeight: '700'},
-  heroDots: {
-    position: 'absolute',
-    bottom: 18,
-    left: 0,
-    right: 0,
+  heroBottom: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    gap: 13,
+    marginTop: 10,
+    justifyContent: 'space-between',
   },
-  heroDot: {
-    width: 11,
-    height: 11,
-    borderRadius: 6,
-    backgroundColor: '#D8E6E5',
+  heroVisual: {
+    width: 125,
+    height: 170,
+    flexShrink: 1,
   },
-  heroDotActive: {width: 74, backgroundColor: '#0A948A'},
-  featureList: {paddingHorizontal: 16, paddingVertical: 28, gap: 12},
-  featureCard: {
-    width: 156,
-    minHeight: 142,
-    padding: 17,
-    borderRadius: 18,
+  heroCircle: {
+    position: 'absolute',
+    width: 130,
+    height: 130,
+    borderRadius: 100,
+    right: -10,
+    bottom: 15,
+    backgroundColor: '#0A6E72',
+  },
+  heroImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    right: 0,
+    bottom: 0,
+  },
+  benefits: { paddingHorizontal: 16, paddingVertical: 26, gap: 11 },
+  benefitCard: {
+    width: 145,
+    minHeight: 130,
+    padding: 15,
+    borderRadius: 17,
     borderWidth: 1,
     borderColor: COLORS.border,
     backgroundColor: COLORS.white,
   },
-  featureIconCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#FFF9DE',
+  benefitIconWrap: {
+    width: 39,
+    height: 39,
+    borderRadius: 20,
+    backgroundColor: '#FFF8DA',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 13,
+    marginBottom: 11,
   },
-  featureIcon: {color: '#6D6A57', fontSize: 15, fontWeight: '800'},
-  featureTitle: {color: COLORS.ink, fontSize: 14, fontWeight: '800'},
-  featureSubtitle: {
+  benefitTitle: { color: COLORS.ink, fontSize: 13, fontWeight: '900' },
+  benefitText: {
     color: COLORS.muted,
-    marginTop: 5,
-    fontSize: 12,
-    lineHeight: 17,
+    fontSize: 10,
+    lineHeight: 15,
+    marginTop: 4,
   },
-  sectionHeader: {
+  sectionHeading: {
     paddingHorizontal: 16,
-    marginTop: 6,
-    marginBottom: 17,
+    marginTop: 4,
+    marginBottom: 16,
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
-    gap: 8,
   },
-  discountHeadingWrap: {flex: 1},
+  sectionCopy: { flex: 1, paddingRight: 10 },
+  sectionAction: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   sectionTitle: {
     color: COLORS.ink,
     fontSize: 21,
     lineHeight: 27,
-    letterSpacing: -0.3,
-    fontWeight: '800',
-  },
-  sectionSubtitle: {
-    marginTop: 4,
-    color: COLORS.muted,
-    fontSize: 12,
-    lineHeight: 18,
-  },
-  viewAll: {color: COLORS.teal, fontSize: 13, fontWeight: '800', paddingVertical: 4},
-  categoryList: {paddingHorizontal: 16, paddingBottom: 34, gap: 14},
-  categoryItem: {width: 82, alignItems: 'center'},
-  categoryImageWrap: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryImage: {width: 58, height: 58},
-  categoryLabel: {
-    marginTop: 9,
-    minHeight: 34,
-    color: COLORS.ink,
-    fontSize: 12,
-    lineHeight: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  productList: {paddingHorizontal: 16, paddingBottom: 34, gap: 14},
-  productCard: {
-    width: PRODUCT_CARD_WIDTH,
-    padding: 14,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
-    shadowColor: '#0B403C',
-    shadowOffset: {width: 0, height: 7},
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: 3,
-  },
-  productImageWrap: {
-    height: 220,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    backgroundColor: '#F5F7F6',
-  },
-  productImage: {width: '92%', height: '92%'},
-  discountBadge: {
-    position: 'absolute',
-    left: 10,
-    top: 10,
-    borderRadius: 4,
-    backgroundColor: COLORS.red,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  discountText: {color: COLORS.white, fontSize: 10, fontWeight: '800'},
-  floatingHeart: {
-    position: 'absolute',
-    right: 10,
-    top: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.white,
-    shadowColor: '#1D3030',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  heartText: {color: COLORS.ink, fontSize: 22, lineHeight: 26},
-  heartTextActive: {color: COLORS.red},
-  storeLabel: {marginTop: 14, color: COLORS.teal, fontSize: 11, fontWeight: '700'},
-  productName: {
-    minHeight: 44,
-    marginTop: 5,
-    color: COLORS.ink,
-    fontSize: 15,
-    lineHeight: 21,
-    fontWeight: '800',
-  },
-  ratingRow: {marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 5},
-  stars: {color: COLORS.yellow, letterSpacing: 1, fontSize: 13},
-  reviewText: {color: COLORS.muted, fontSize: 11},
-  priceRow: {marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8},
-  price: {color: COLORS.ink, fontSize: 17, fontWeight: '900'},
-  oldPrice: {color: '#9CA3A7', fontSize: 12, textDecorationLine: 'line-through'},
-  addButton: {
-    height: 46,
-    borderRadius: 24,
-    marginTop: 14,
-    backgroundColor: COLORS.teal,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 7,
-  },
-  addButtonPressed: {backgroundColor: COLORS.darkTeal},
-  addButtonIcon: {color: COLORS.white, fontSize: 19, fontWeight: '500'},
-  addButtonText: {color: COLORS.white, fontSize: 14, fontWeight: '800'},
-  emptyState: {
-    marginHorizontal: 16,
-    marginBottom: 34,
-    padding: 28,
-    borderRadius: 18,
-    alignItems: 'center',
-    backgroundColor: COLORS.surface,
-  },
-  emptyStateTitle: {color: COLORS.ink, fontSize: 16, fontWeight: '800'},
-  emptyStateText: {color: COLORS.muted, fontSize: 13, marginTop: 5},
-  dealBanner: {
-    minHeight: 235,
-    marginHorizontal: 16,
-    padding: 24,
-    borderRadius: 24,
-    overflow: 'hidden',
-    backgroundColor: COLORS.darkTeal,
-    flexDirection: 'row',
-  },
-  dealContent: {width: '67%', zIndex: 2},
-  dealEyebrow: {color: COLORS.yellow, fontSize: 10, letterSpacing: 1, fontWeight: '900'},
-  dealTitle: {
-    marginTop: 8,
-    color: COLORS.white,
-    fontSize: 24,
-    lineHeight: 29,
     fontWeight: '900',
   },
-  dealText: {marginTop: 9, color: '#CDE2E0', fontSize: 12, lineHeight: 18},
+  sectionSubtitle: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
+  viewAll: {
+    color: COLORS.teal,
+    fontSize: 11,
+    fontWeight: '900',
+    paddingVertical: 4,
+  },
+  categoryList: { paddingHorizontal: 16, paddingBottom: 30, gap: 15 },
+  category: { width: 76, alignItems: 'center' },
+  categoryIcon: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryLabel: {
+    minHeight: 32,
+    marginTop: 8,
+    color: COLORS.ink,
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: 'center',
+    fontWeight: '700',
+  },
+  productList: { paddingHorizontal: 16, paddingBottom: 30, gap: 13 },
+  dealBanner: {
+    minHeight: 225,
+    marginHorizontal: 16,
+    marginBottom: 30,
+    padding: 23,
+    borderRadius: 23,
+    overflow: 'hidden',
+    backgroundColor: COLORS.tealDark,
+  },
+  dealEyebrow: {
+    color: COLORS.yellow,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    fontWeight: '900',
+  },
+  dealTitle: {
+    width: '65%',
+    color: COLORS.white,
+    fontSize: 26,
+    lineHeight: 32,
+    fontWeight: '900',
+    marginTop: 9,
+  },
+  dealText: {
+    width: '64%',
+    color: '#CFE3E1',
+    fontSize: 12,
+    lineHeight: 18,
+    marginTop: 8,
+  },
   dealButton: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     alignSelf: 'flex-start',
-    marginTop: 16,
-    paddingHorizontal: 16,
+    marginTop: 15,
+    paddingHorizontal: 15,
     paddingVertical: 11,
     borderRadius: 20,
     backgroundColor: COLORS.yellow,
   },
-  dealButtonText: {color: '#4A3B00', fontSize: 12, fontWeight: '900'},
+  dealButtonText: { color: '#4E3E00', fontSize: 11, fontWeight: '900' },
   dealImage: {
     position: 'absolute',
-    width: 155,
-    height: 190,
-    right: -38,
-    bottom: -13,
-    opacity: 0.92,
+    width: 110,
+    height: 165,
+    right: 5,
+    bottom: 8,
   },
-  bottomNav: {
-    minHeight: 72,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    backgroundColor: COLORS.white,
+  sellerPreview: {
+    marginHorizontal: 16,
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-around',
-    shadowColor: '#1B3331',
-    shadowOffset: {width: 0, height: -4},
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 10,
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  navItem: {flex: 1, alignItems: 'center', justifyContent: 'center'},
-  navIcon: {color: COLORS.ink, fontSize: 24, lineHeight: 27},
-  navIconActive: {color: COLORS.teal},
-  navLabel: {marginTop: 2, color: COLORS.ink, fontSize: 11, fontWeight: '500'},
-  navLabelActive: {color: COLORS.teal, fontWeight: '800'},
+  sellerMini: {
+    flex: 1,
+    minWidth: 80,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 16,
+    alignItems: 'center',
+  },
+  sellerAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.tealSoft,
+  },
+  sellerAvatarYellow: { backgroundColor: '#FFF4CF' },
+  sellerAvatarText: { color: COLORS.tealDark, fontSize: 18, fontWeight: '900' },
+  sellerName: {
+    color: COLORS.ink,
+    fontSize: 10,
+    fontWeight: '800',
+    marginTop: 8,
+  },
+  sellerRating: {
+    color: COLORS.orange,
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  sellerRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 4,
+  },
 });
-
-export default HomeScreen;

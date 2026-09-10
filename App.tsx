@@ -1,14 +1,12 @@
 import React from 'react';
-import {StatusBar} from 'react-native';
-import {SafeAreaProvider} from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import HomeScreen from './src/screens/HomeScreen';
+import SellzyApp from './src/SellzyApp';
 
 function App() {
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" />
-      <HomeScreen />
+      <SellzyApp />
     </SafeAreaProvider>
   );
 }

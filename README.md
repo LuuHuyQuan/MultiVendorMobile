@@ -1,97 +1,70 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Sellzy Mobile
 
-# Getting Started
+Ứng dụng mua sắm đa nhà bán được xây dựng bằng React Native 0.87, dựa trên giao diện tham khảo [Sellzy HTML](https://sellzy-html.vercel.app/).
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Tính năng
 
-## Step 1: Start Metro
+- Trang chủ, danh mục sản phẩm, tìm kiếm, lọc và sắp xếp.
+- Chi tiết sản phẩm, sản phẩm yêu thích và giỏ hàng có kiểm tra tồn kho.
+- Mã ưu đãi `SELLZY10` giảm 10% giá trị sản phẩm.
+- Checkout có kiểm tra thông tin giao hàng, lưu đơn hàng và hỗ trợ thêm lại sản phẩm từ đơn cũ.
+- Hồ sơ khách hàng, danh sách nhà bán và bản nháp đăng ký nhà bán.
+- Dữ liệu giỏ hàng, yêu thích, hồ sơ, đơn hàng và bản nháp được lưu bằng AsyncStorage.
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Phạm vi bản demo
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+Đây là ứng dụng demo chạy cục bộ. Danh mục được đóng gói trong ứng dụng; chưa có máy chủ, đăng nhập thật, cổng thanh toán, vận chuyển, thông báo đẩy, hỗ trợ trực tuyến hoặc quy trình duyệt nhà bán. Thao tác **Place Demo Order** chỉ lưu đơn trên thiết bị, không thu tiền và không tạo vận đơn.
 
-```sh
-# Using npm
+## Yêu cầu phát triển
+
+- Node.js `>= 22.11.0` và npm.
+- JDK 17.
+- Android Studio cùng Android SDK; dự án hiện biên dịch với SDK Platform 37, Build Tools 37.0.0 và NDK 27.1.12297006.
+- Một Android Emulator đang chạy hoặc thiết bị Android đã bật USB debugging.
+
+Thiết lập `ANDROID_HOME`/`ANDROID_SDK_ROOT`, hoặc tạo `android/local.properties` với đường dẫn SDK của máy. Không sao chép Android SDK vào repository.
+
+## Chạy ứng dụng
+
+```powershell
+npm ci
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
+Mở terminal thứ hai trong thư mục dự án:
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
+```powershell
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
+## Kiểm tra
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
+```powershell
+npm test -- --runInBand
+npm run lint
+npx tsc --noEmit
 ```
 
-Then, and every time you update your native dependencies, run:
+## Tạo APK Android
 
-```sh
-bundle exec pod install
+APK debug, dùng cho thử nghiệm cùng Metro:
+
+```powershell
+cd android
+.\gradlew.bat :app:assembleDebug
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+Kết quả: `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-```sh
-# Using npm
-npm run ios
+Bản release cục bộ có JavaScript bundle sẵn:
 
-# OR using Yarn
-yarn ios
+```powershell
+cd android
+.\gradlew.bat :app:assembleRelease
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+Kết quả: `android/app/build/outputs/apk/release/app-release.apk`. Cấu hình hiện tại ký bản release bằng debug keystore, vì vậy APK này chỉ dành cho xem thử; cần keystore riêng và cấu hình phát hành an toàn trước khi đưa lên cửa hàng.
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+## Nguồn tham khảo
 
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Thiết kế và các ảnh sản phẩm demo được tham khảo từ trang [Sellzy HTML](https://sellzy-html.vercel.app/). Dự án này không tuyên bố liên kết chính thức với Sellzy; hãy xác minh quyền sử dụng thương hiệu và hình ảnh trước khi phát hành thương mại.
