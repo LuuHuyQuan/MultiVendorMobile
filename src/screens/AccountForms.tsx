@@ -100,15 +100,18 @@ export function AccountField({
 export function AccountAction({
   label,
   onPress,
+  testID,
 }: {
   label: string;
   onPress: () => void;
+  testID?: string;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+      testID={testID}
     >
       <Text style={styles.actionText}>{label}</Text>
     </Pressable>

@@ -123,11 +123,34 @@ describe('restoring saved shopping state', () => {
       payment: 'cash',
       notifications: false,
     });
+    expect(restored.auth).toEqual({ isLoggedIn: false, email: '' });
     expect(restored.vendorDraft).toMatchObject({
       storeName: 'My Store',
       description: 'x'.repeat(2000),
       ownerName: '',
     });
+  });
+
+  test('restores a valid login session without storing a password', () => {
+    const restored = restoreStore(
+      JSON.stringify({
+        version: 1,
+        auth: { isLoggedIn: true, email: ' USER@Example.com ' },
+      }),
+    );
+    expect(restored.auth).toEqual({
+      isLoggedIn: true,
+      email: 'user@example.com',
+    });
+    expect(JSON.stringify(restored)).not.toContain('password');
+    expect(
+      restoreStore(
+        JSON.stringify({
+          version: 1,
+          auth: { isLoggedIn: true, email: 'invalid' },
+        }),
+      ).auth.isLoggedIn,
+    ).toBe(false);
   });
 
   test('loads the correct key and propagates read errors instead of treating them as empty state', async () => {

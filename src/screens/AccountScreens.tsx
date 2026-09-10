@@ -13,7 +13,7 @@ import {
 
 import {
   AccountProfile,
-  defaultAccountProfile,
+  AuthSession,
   emptyVendorDraft,
   VendorDraft,
 } from '../accountTypes';
@@ -357,7 +357,10 @@ type AccountProps = {
   cartCount: number;
   wishlistCount: number;
   orderCount: number;
+  auth: AuthSession;
   profile: AccountProfile;
+  onLogin: (email: string) => void;
+  onLogout: () => void;
   onSaveProfile: (profile: AccountProfile) => void;
   onCart: () => void;
   onOrders: () => void;
@@ -371,7 +374,10 @@ export function AccountScreen({
   cartCount,
   wishlistCount,
   orderCount,
+  auth,
   profile,
+  onLogin,
+  onLogout,
   onSaveProfile,
   onCart,
   onOrders,
@@ -380,6 +386,8 @@ export function AccountScreen({
   onHelp,
 }: AccountProps) {
   const [editor, setEditor] = useState<ProfileEditor | null>(null);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const initials = profile.name.trim()
     ? profile.name
         .trim()
@@ -389,20 +397,6 @@ export function AccountScreen({
         .join('')
         .toUpperCase()
     : 'S';
-  const resetProfile = () => {
-    Alert.alert(
-      'Reset this local profile?',
-      'Your name, contact details, delivery address and preferences will be cleared on this device. Cart, wishlist, orders and vendor draft will remain.',
-      [
-        { text: 'Keep profile', style: 'cancel' },
-        {
-          text: 'Reset profile',
-          style: 'destructive',
-          onPress: () => onSaveProfile({ ...defaultAccountProfile }),
-        },
-      ],
-    );
-  };
   return (
     <View style={[sharedStyles.screen, { paddingTop: topInset }]}>
       <ScreenHeader
@@ -421,22 +415,33 @@ export function AccountScreen({
           </View>
           <View style={styles.profileCopy}>
             <Text style={styles.profileName}>
-              {profile.name || 'Guest shopper'}
+              {auth.isLoggedIn
+                ? profile.name || 'Sellzy shopper'
+                : 'Guest shopper'}
             </Text>
             <Text style={styles.profileEmail}>
-              {profile.email || 'Add your details for faster checkout'}
+              {auth.isLoggedIn
+                ? auth.email
+                : 'Shop freely — no account required'}
             </Text>
             <View style={styles.memberBadge}>
-              <Text style={styles.memberText}>LOCAL PROFILE</Text>
+              <Text style={styles.memberText}>
+                {auth.isLoggedIn ? 'SIGNED IN' : 'GUEST MODE'}
+              </Text>
             </View>
           </View>
           <Pressable
-            accessibilityLabel="Edit profile"
+            accessibilityLabel={auth.isLoggedIn ? 'Edit profile' : 'Sign in'}
             accessibilityRole="button"
-            onPress={() => setEditor('profile')}
+            onPress={() =>
+              auth.isLoggedIn ? setEditor('profile') : setShowLogin(true)
+            }
             style={styles.editButton}
+            testID="account-auth-button"
           >
-            <Text style={styles.editText}>Edit</Text>
+            <Text style={styles.editText}>
+              {auth.isLoggedIn ? 'Edit' : 'Sign in'}
+            </Text>
           </Pressable>
         </View>
 
@@ -502,16 +507,30 @@ export function AccountScreen({
           subtitle="Shopping settings and notification preference"
         />
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={resetProfile}
-          style={styles.signOutButton}
-        >
-          <Text style={styles.signOutText}>Reset local profile</Text>
-        </Pressable>
+        {auth.isLoggedIn ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setShowLogout(true)}
+            style={styles.signOutButton}
+            testID="account-logout"
+          >
+            <Icon color={COLORS.red} name="logout" size={16} />
+            <Text style={styles.signOutText}>Sign out</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setShowLogin(true)}
+            style={styles.loginButton}
+            testID="account-login"
+          >
+            <Text style={styles.loginButtonText}>Sign in to your account</Text>
+          </Pressable>
+        )}
         <Text style={styles.profileNote}>
-          You are shopping as a guest. Your details stay on this device; an
-          online account is not created.
+          {auth.isLoggedIn
+            ? 'Signed in on this device. Your password is never saved.'
+            : 'You can shop and checkout as a guest. Sign in is optional.'}
         </Text>
         <Text style={styles.version}>Sellzy Mobile · Version 1.0.0</Text>
       </ScrollView>
@@ -526,7 +545,120 @@ export function AccountScreen({
           profile={profile}
         />
       ) : null}
+      {showLogin ? (
+        <LoginForm
+          initialEmail={profile.email}
+          onClose={() => setShowLogin(false)}
+          onLogin={email => {
+            onLogin(email);
+            setShowLogin(false);
+          }}
+        />
+      ) : null}
+      {showLogout ? (
+        <AccountDialog onClose={() => setShowLogout(false)} title="Sign out?">
+          <AccountNotice>
+            Your cart, wishlist, orders and local shopping details will remain
+            on this device.
+          </AccountNotice>
+          <AccountAction
+            label="Yes, sign out"
+            onPress={() => {
+              onLogout();
+              setShowLogout(false);
+            }}
+            testID="logout-confirm"
+          />
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setShowLogout(false)}
+            style={styles.continueGuestButton}
+          >
+            <Text style={styles.continueGuestText}>Stay signed in</Text>
+          </Pressable>
+        </AccountDialog>
+      ) : null}
     </View>
+  );
+}
+
+function LoginForm({
+  initialEmail,
+  onLogin,
+  onClose,
+}: {
+  initialEmail: string;
+  onLogin: (email: string) => void;
+  onClose: () => void;
+}) {
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState('');
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
+    {},
+  );
+  const submit = () => {
+    const normalizedEmail = email.trim().toLowerCase();
+    const nextErrors: typeof errors = {};
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      nextErrors.email = 'Enter a valid email address.';
+    }
+    if (password.length < 6) {
+      nextErrors.password = 'Password must contain at least 6 characters.';
+    }
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      return;
+    }
+    onLogin(normalizedEmail);
+  };
+  return (
+    <AccountDialog
+      onClose={onClose}
+      subtitle="Optional — you can continue shopping as a guest"
+      title="Sign in to Sellzy"
+    >
+      <AccountNotice>
+        Demo sign-in works with any valid email and a password of 6 or more
+        characters. The password is not stored or sent anywhere.
+      </AccountNotice>
+      <AccountField
+        autoCapitalize="none"
+        autoComplete="email"
+        error={errors.email}
+        keyboardType="email-address"
+        label="Email address"
+        onChangeText={value => {
+          setEmail(value);
+          setErrors(current => ({ ...current, email: undefined }));
+        }}
+        placeholder="you@example.com"
+        testID="login-email"
+        value={email}
+      />
+      <AccountField
+        autoCapitalize="none"
+        autoComplete="password"
+        error={errors.password}
+        label="Password"
+        onChangeText={value => {
+          setPassword(value);
+          setErrors(current => ({ ...current, password: undefined }));
+        }}
+        onSubmitEditing={submit}
+        placeholder="At least 6 characters"
+        secureTextEntry
+        testID="login-password"
+        value={password}
+      />
+      <AccountAction label="Sign in" onPress={submit} testID="login-submit" />
+      <Pressable
+        accessibilityRole="button"
+        onPress={onClose}
+        style={styles.continueGuestButton}
+      >
+        <Text style={styles.continueGuestText}>Continue as guest</Text>
+      </Pressable>
+    </AccountDialog>
   );
 }
 
@@ -1353,9 +1485,27 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
     backgroundColor: '#FFF0F3',
   },
   signOutText: { color: COLORS.red, fontSize: 12, fontWeight: '900' },
+  loginButton: {
+    height: 49,
+    marginTop: 24,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.teal,
+  },
+  loginButtonText: { color: COLORS.white, fontSize: 12, fontWeight: '900' },
+  continueGuestButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 6,
+  },
+  continueGuestText: { color: COLORS.teal, fontSize: 12, fontWeight: '800' },
   profileNote: {
     color: COLORS.muted,
     fontSize: 10,

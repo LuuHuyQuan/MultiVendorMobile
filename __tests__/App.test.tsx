@@ -46,6 +46,48 @@ test('hydrates local data and renders the home screen', async () => {
   await ReactTestRenderer.act(async () => renderer.unmount());
 });
 
+test('starts in guest mode and supports optional local sign in', async () => {
+  getItem.mockResolvedValueOnce(null);
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
+
+  await press(renderer, { accessibilityLabel: 'Account' });
+  expect(renderer.root.findByProps({ children: 'Guest shopper' })).toBeTruthy();
+  await press(renderer, { testID: 'account-login' });
+  await ReactTestRenderer.act(async () => {
+    renderer.root
+      .findByProps({ testID: 'login-email' })
+      .props.onChangeText('USER@example.com');
+    renderer.root
+      .findByProps({ testID: 'login-password' })
+      .props.onChangeText('secret1');
+  });
+  await press(renderer, { testID: 'login-submit' });
+
+  expect(
+    renderer.root.findByProps({ children: 'user@example.com' }),
+  ).toBeTruthy();
+  expect(renderer.root.findByProps({ children: 'SIGNED IN' })).toBeTruthy();
+  const saved = JSON.parse(setItem.mock.calls.at(-1)![1]);
+  expect(saved.auth).toEqual({
+    isLoggedIn: true,
+    email: 'user@example.com',
+  });
+  expect(JSON.stringify(saved)).not.toContain('secret1');
+
+  await press(renderer, { testID: 'account-logout' });
+  await press(renderer, { testID: 'logout-confirm' });
+  expect(renderer.root.findByProps({ children: 'Guest shopper' })).toBeTruthy();
+  expect(JSON.parse(setItem.mock.calls.at(-1)![1]).auth).toEqual({
+    isLoggedIn: false,
+    email: '',
+  });
+
+  await ReactTestRenderer.act(async () => renderer.unmount());
+});
+
 test('offers a retry after a local-data read failure', async () => {
   let failRead!: (reason: Error) => void;
   getItem.mockReturnValueOnce(

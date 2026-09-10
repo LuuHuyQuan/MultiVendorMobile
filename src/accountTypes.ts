@@ -18,6 +18,16 @@ export const defaultAccountProfile: AccountProfile = {
   notifications: false,
 };
 
+export type AuthSession = {
+  isLoggedIn: boolean;
+  email: string;
+};
+
+export const defaultAuthSession: AuthSession = {
+  isLoggedIn: false,
+  email: '',
+};
+
 export type VendorDraft = {
   storeName: string;
   ownerName: string;

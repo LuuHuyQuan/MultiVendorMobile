@@ -1,6 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AccountProfile,
+  AuthSession,
+  defaultAuthSession,
   defaultAccountProfile,
   emptyVendorDraft,
   VendorDraft,
@@ -17,6 +19,7 @@ export type StoreData = {
   coupon: string;
   orders: Order[];
   profile: AccountProfile;
+  auth: AuthSession;
   vendorDraft: VendorDraft;
 };
 
@@ -28,6 +31,7 @@ export function emptyStore(): StoreData {
     coupon: '',
     orders: [],
     profile: { ...defaultAccountProfile },
+    auth: { ...defaultAuthSession },
     vendorDraft: { ...emptyVendorDraft },
   };
 }
@@ -101,6 +105,18 @@ export function restoreStore(raw: string | null): StoreData {
     result.profile.payment =
       parsed.profile.payment === 'card' ? 'card' : 'cash';
     result.profile.notifications = parsed.profile.notifications === true;
+  }
+  if (isRecord(parsed.auth)) {
+    const email =
+      typeof parsed.auth.email === 'string'
+        ? parsed.auth.email.trim().toLowerCase().slice(0, 254)
+        : '';
+    result.auth = {
+      isLoggedIn:
+        parsed.auth.isLoggedIn === true &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
+      email,
+    };
   }
   if (isRecord(parsed.vendorDraft)) {
     for (const key of [

@@ -17,6 +17,7 @@ import {
   reorderCart,
 } from './commerce';
 import { products, getProduct } from './data/catalog';
+import { defaultAuthSession } from './accountTypes';
 import {
   AccountScreen,
   HelpScreen,
@@ -64,7 +65,7 @@ export default function SellzyApp() {
   const placing = useRef(false);
   const sequence = useRef(0);
   const route = routes[routes.length - 1];
-  const { cart, coupon, wishlistIds, orders, profile } = data;
+  const { auth, cart, coupon, wishlistIds, orders, profile } = data;
   const cartCount = Object.values(cart).reduce(
     (sum, quantity) => sum + quantity,
     0,
@@ -372,6 +373,32 @@ export default function SellzyApp() {
         return (
           <AccountScreen
             {...shared}
+            auth={auth}
+            onLogin={email => {
+              const normalizedEmail = email.trim().toLowerCase();
+              commit(current => ({
+                ...current,
+                auth: { isLoggedIn: true, email: normalizedEmail },
+                profile: {
+                  ...current.profile,
+                  email: normalizedEmail,
+                  name:
+                    current.profile.name ||
+                    normalizedEmail
+                      .split('@')[0]
+                      .replace(/[._-]+/g, ' ')
+                      .replace(/\b\w/g, letter => letter.toUpperCase()),
+                },
+              }));
+              setToast('Signed in successfully');
+            }}
+            onLogout={() => {
+              commit(current => ({
+                ...current,
+                auth: { ...defaultAuthSession },
+              }));
+              setToast('You are now signed out');
+            }}
             profile={profile}
             onSaveProfile={next => {
               commit(current => ({ ...current, profile: next }));
