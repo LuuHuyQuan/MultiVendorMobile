@@ -8,12 +8,13 @@
 - Chi tiết sản phẩm, sản phẩm yêu thích và giỏ hàng có kiểm tra tồn kho.
 - Mã ưu đãi `SELLZY10` giảm 10% giá trị sản phẩm.
 - Checkout 3 bước (giao hàng, thanh toán, kiểm tra đơn), có form thẻ demo không lưu dữ liệu thẻ; lưu đơn hàng cục bộ và hỗ trợ thêm lại sản phẩm từ đơn cũ.
+- Đăng nhập/đăng xuất tùy chọn trên thiết bị; người dùng vẫn có thể mua hàng ngay ở chế độ khách.
 - Hồ sơ khách hàng, danh sách nhà bán và bản nháp đăng ký nhà bán.
 - Dữ liệu giỏ hàng, yêu thích, hồ sơ, đơn hàng và bản nháp được lưu bằng AsyncStorage.
 
 ## Phạm vi bản demo
 
-Đây là ứng dụng demo chạy cục bộ. Danh mục được đóng gói trong ứng dụng; chưa có máy chủ, đăng nhập thật, cổng thanh toán, vận chuyển, thông báo đẩy, hỗ trợ trực tuyến hoặc quy trình duyệt nhà bán. Thao tác **Place Demo Order** chỉ lưu đơn trong trình duyệt, không thu tiền và không tạo vận đơn.
+Đây là ứng dụng demo chạy cục bộ. Danh mục được đóng gói trong ứng dụng; chưa có máy chủ, xác thực tài khoản thật, cổng thanh toán, vận chuyển, thông báo đẩy, hỗ trợ trực tuyến hoặc quy trình duyệt nhà bán. Đăng nhập hiện là mô phỏng cục bộ và không lưu mật khẩu. Thao tác **Place Demo Order** chỉ lưu đơn trong trình duyệt, không thu tiền và không tạo vận đơn.
 
 ## Yêu cầu phát triển
 
@@ -23,6 +24,7 @@
 ## Chạy ứng dụng
 
 ```powershell
+cd MultiVendor
 npm ci
 npm start
 ```
