@@ -118,6 +118,24 @@ test('completes a local checkout and shows the saved order', async () => {
     });
   }
 
+  await press(renderer, { testID: 'checkout-continue-payment' });
+  await press(renderer, { accessibilityLabel: 'Credit or debit card' });
+  const cardValues = [
+    ['card-holder', 'Jane Nguyen'],
+    ['card-number', '4242424242424242'],
+    ['card-expiry', '1230'],
+    ['card-cvv', '123'],
+  ] as const;
+  for (const [testID, value] of cardValues) {
+    await ReactTestRenderer.act(async () => {
+      renderer.root.findByProps({ testID }).props.onChangeText(value);
+    });
+  }
+  await press(renderer, { testID: 'checkout-review-order' });
+  expect(
+    renderer.root.findByProps({ children: 'Demo card ending 4242' }),
+  ).toBeTruthy();
+
   await press(renderer, { testID: 'place-order' });
   expect(renderer.root.findByProps({ children: 'Order saved!' })).toBeTruthy();
   await press(renderer, { testID: 'view-orders' });
@@ -131,6 +149,8 @@ test('completes a local checkout and shows the saved order', async () => {
     itemCount: 1,
     simulated: true,
   });
+  expect(saved.orders[0].delivery.payment).toBe('card');
+  expect(JSON.stringify(saved)).not.toContain('4242 4242');
 
   await ReactTestRenderer.act(async () => renderer.unmount());
 });

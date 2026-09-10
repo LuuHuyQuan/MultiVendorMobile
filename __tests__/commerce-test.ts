@@ -7,6 +7,7 @@ import {
   orderLines,
   reorderCart,
   validateDelivery,
+  validateDemoCard,
 } from '../src/commerce';
 import { products } from '../src/data/catalog';
 import type { CustomerDetails, Order } from '../src/types';
@@ -118,6 +119,30 @@ describe('checkout totals', () => {
 });
 
 describe('delivery and orders', () => {
+  test('validates demo card fields without storing card data', () => {
+    expect(
+      validateDemoCard({
+        cardholder: 'Jane Nguyen',
+        number: '4242 4242 4242 4242',
+        expiry: '12/30',
+        cvv: '123',
+      }),
+    ).toEqual({});
+    expect(
+      validateDemoCard({
+        cardholder: '',
+        number: '4242 4242 4242 4241',
+        expiry: '13/30',
+        cvv: '12',
+      }),
+    ).toEqual({
+      cardholder: expect.any(String),
+      number: expect.any(String),
+      expiry: expect.any(String),
+      cvv: expect.any(String),
+    });
+  });
+
   test('validates all required delivery fields and accepts formatted phone numbers', () => {
     expect(validateDelivery(validDelivery())).toEqual({});
     expect(

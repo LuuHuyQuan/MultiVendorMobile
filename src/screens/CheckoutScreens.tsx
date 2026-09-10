@@ -1,5 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
+  BackHandler,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -13,10 +14,19 @@ import {
 
 import { EmptyState, ScreenHeader, sharedStyles } from '../components/SellzyUI';
 import { products } from '../data/catalog';
-import { calculateTotals, validateDelivery } from '../commerce';
+import {
+  calculateTotals,
+  validateDelivery,
+  validateDemoCard,
+} from '../commerce';
 import { Icon, IconName } from '../components/Icon';
 import { COLORS, money } from '../theme';
-import { CartQuantities, CustomerDetails, Product } from '../types';
+import {
+  CartQuantities,
+  CustomerDetails,
+  DemoCardDetails,
+  Product,
+} from '../types';
 type CartProps = {
   topInset: number;
   cart: CartQuantities;
@@ -300,7 +310,15 @@ export function CheckoutScreen({
   onPlaceOrder,
 }: CheckoutProps) {
   const [details, setDetails] = useState<CustomerDetails>(initialDetails);
-  const [attempted, setAttempted] = useState(false);
+  const [card, setCard] = useState<DemoCardDetails>({
+    cardholder: '',
+    number: '',
+    expiry: '',
+    cvv: '',
+  });
+  const [step, setStep] = useState(0);
+  const [deliveryAttempted, setDeliveryAttempted] = useState(false);
+  const [paymentAttempted, setPaymentAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const lines = cartProducts(cart);
@@ -308,11 +326,37 @@ export function CheckoutScreen({
     cart,
     couponCode,
   );
-  const errors = validateDelivery(details);
-  const valid = Object.keys(errors).length === 0;
+  const deliveryErrors = validateDelivery(details);
+  const cardErrors = validateDemoCard(card);
+  const deliveryValid = Object.keys(deliveryErrors).length === 0;
+  const paymentValid =
+    details.payment === 'cash' || Object.keys(cardErrors).length === 0;
 
   const update = (key: keyof CustomerDetails, value: string) =>
     setDetails(current => ({ ...current, [key]: value }));
+  const updateCard = (key: keyof DemoCardDetails, value: string) =>
+    setCard(current => ({ ...current, [key]: value }));
+  const changeStep = (next: number) => {
+    setStep(next);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+  useEffect(() => {
+    if (step === 0) return;
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        setStep(current => Math.max(0, current - 1));
+        scrollRef.current?.scrollTo({ y: 0, animated: true });
+        return true;
+      },
+    );
+    return () => subscription.remove();
+  }, [step]);
+  const handleBack = () => {
+    if (step > 0) changeStep(step - 1);
+    else onBack();
+  };
+  const stepLabels = ['Delivery', 'Payment', 'Review'];
 
   return (
     <KeyboardAvoidingView
@@ -321,8 +365,8 @@ export function CheckoutScreen({
     >
       <ScreenHeader
         canGoBack
-        onBack={onBack}
-        subtitle="Review delivery and payment"
+        onBack={handleBack}
+        subtitle={`Step ${step + 1} of 3 · ${stepLabels[step]}`}
         title="Checkout"
       />
       <ScrollView
@@ -332,173 +376,407 @@ export function CheckoutScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.steps}>
-          {['Cart', 'Delivery', 'Payment'].map((step, index) => (
-            <View key={step} style={styles.stepItem}>
+          {stepLabels.map((label, index) => (
+            <View key={label} style={styles.stepItem}>
               <View
                 style={[
                   styles.stepCircle,
-                  index < 2 && styles.stepCircleActive,
+                  index <= step && styles.stepCircleActive,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.stepNumber,
-                    index < 2 && styles.stepNumberActive,
-                  ]}
-                >
-                  {index + 1}
-                </Text>
+                {index < step ? (
+                  <Icon name="check" size={16} color={COLORS.white} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.stepNumber,
+                      index <= step && styles.stepNumberActive,
+                    ]}
+                  >
+                    {index + 1}
+                  </Text>
+                )}
               </View>
               <Text
-                style={[styles.stepLabel, index < 2 && styles.stepLabelActive]}
+                style={[
+                  styles.stepLabel,
+                  index <= step && styles.stepLabelActive,
+                ]}
               >
-                {step}
+                {label}
               </Text>
             </View>
           ))}
         </View>
 
-        <View style={styles.formCard}>
-          <Text style={styles.formTitle}>Delivery details</Text>
-          <CheckoutField
-            error={attempted ? errors.fullName : undefined}
-            testID="checkout-name"
-            label="Full name"
-            onChangeText={value => update('fullName', value)}
-            placeholder="Your full name"
-            value={details.fullName}
-          />
-          <CheckoutField
-            error={attempted ? errors.phone : undefined}
-            testID="checkout-phone"
-            keyboardType="phone-pad"
-            label="Phone number"
-            onChangeText={value => update('phone', value)}
-            placeholder="Phone number"
-            value={details.phone}
-          />
-          <CheckoutField
-            error={attempted ? errors.address : undefined}
-            testID="checkout-address"
-            label="Street address"
-            onChangeText={value => update('address', value)}
-            placeholder="House number and street"
-            value={details.address}
-          />
-          <CheckoutField
-            error={attempted ? errors.city : undefined}
-            testID="checkout-city"
-            label="City"
-            onChangeText={value => update('city', value)}
-            placeholder="City"
-            value={details.city}
-          />
-          {attempted && !valid ? (
-            <Text style={styles.formError}>
-              Please complete all delivery fields correctly.
-            </Text>
-          ) : null}
-        </View>
-
-        <View style={styles.formCard}>
-          <Text style={styles.formTitle}>Payment method</Text>
-          <PaymentOption
-            active={details.payment === 'cash'}
-            icon="truck"
-            label="Cash on delivery"
-            onPress={() => update('payment', 'cash')}
-            subtitle="Payment at delivery"
-          />
-          <PaymentOption
-            active={details.payment === 'card'}
-            icon="credit-card"
-            label="Credit or debit card"
-            onPress={() => update('payment', 'card')}
-            subtitle="Demo payment — no charge is made"
-          />
-          {details.payment === 'card' ? (
-            <View style={styles.demoNotice}>
-              <Text style={styles.demoNoticeText}>
-                Card checkout is shown in demo mode. No real payment details are
-                requested.
-              </Text>
+        {step === 0 ? (
+          <>
+            <View style={styles.formCard}>
+              <Text style={styles.formTitle}>Delivery details</Text>
+              <CheckoutField
+                error={deliveryAttempted ? deliveryErrors.fullName : undefined}
+                testID="checkout-name"
+                label="Full name"
+                onChangeText={value => update('fullName', value)}
+                placeholder="Your full name"
+                value={details.fullName}
+              />
+              <CheckoutField
+                error={deliveryAttempted ? deliveryErrors.phone : undefined}
+                testID="checkout-phone"
+                keyboardType="phone-pad"
+                label="Phone number"
+                onChangeText={value => update('phone', value)}
+                placeholder="Phone number"
+                value={details.phone}
+              />
+              <CheckoutField
+                error={deliveryAttempted ? deliveryErrors.address : undefined}
+                testID="checkout-address"
+                label="Street address"
+                onChangeText={value => update('address', value)}
+                placeholder="House number and street"
+                value={details.address}
+              />
+              <CheckoutField
+                error={deliveryAttempted ? deliveryErrors.city : undefined}
+                testID="checkout-city"
+                label="City"
+                onChangeText={value => update('city', value)}
+                placeholder="City"
+                value={details.city}
+              />
+              {deliveryAttempted && !deliveryValid ? (
+                <Text style={styles.formError}>
+                  Please complete all delivery fields correctly.
+                </Text>
+              ) : null}
             </View>
-          ) : null}
-        </View>
-
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Your order</Text>
-          {lines.map(product => (
-            <View key={product.id} style={styles.checkoutLine}>
-              <Text numberOfLines={1} style={styles.checkoutLineName}>
-                {cart[product.id]} × {product.name}
-              </Text>
-              <Text style={styles.checkoutLinePrice}>
-                {money(product.price * cart[product.id])}
-              </Text>
-            </View>
-          ))}
-          <View style={styles.summaryDivider} />
-          <SummaryRow label="Subtotal" value={money(subtotal)} />
-          {couponCode ? (
-            <SummaryRow
-              label={`Discount (${couponCode})`}
-              positive
-              value={`−${money(discount)}`}
+            <CheckoutSummary
+              cart={cart}
+              couponCode={couponCode}
+              discount={discount}
+              lines={lines}
+              shipping={shipping}
+              subtotal={subtotal}
+              total={total}
             />
-          ) : null}
-          <SummaryRow
-            label="Shipping"
-            positive={shipping === 0}
-            value={shipping === 0 ? 'FREE' : money(shipping)}
-          />
-          <SummaryRow bold label="Order total" value={money(total)} />
-        </View>
+            <Pressable
+              accessibilityRole="button"
+              testID="checkout-continue-payment"
+              onPress={() => {
+                setDeliveryAttempted(true);
+                if (deliveryValid) changeStep(1);
+                else scrollRef.current?.scrollTo({ y: 0, animated: true });
+              }}
+              style={({ pressed }) => [
+                sharedStyles.primaryButton,
+                pressed && styles.pressed,
+              ]}
+            >
+              <Text style={sharedStyles.primaryButtonText}>
+                Continue to payment
+              </Text>
+            </Pressable>
+          </>
+        ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          testID="place-order"
-          disabled={submitting || !lines.length}
-          accessibilityState={{
-            disabled: submitting || !lines.length,
-            busy: submitting,
-          }}
-          onPress={async () => {
-            setAttempted(true);
-            if (!valid) {
-              scrollRef.current?.scrollTo({ y: 0, animated: true });
-              return;
-            }
-            setSubmitting(true);
-            try {
-              await onPlaceOrder(details);
-            } finally {
-              setSubmitting(false);
-            }
-          }}
-          style={({ pressed }) => [
-            sharedStyles.primaryButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Text style={sharedStyles.primaryButtonText}>
-            {submitting
-              ? 'Saving your order…'
-              : `Place Demo Order · ${money(total)}`}
-          </Text>
-        </Pressable>
-        <Text style={styles.secureText}>
-          Demo checkout: this order stays on your device. No payment or shipment
-          is initiated.
-        </Text>
+        {step === 1 ? (
+          <>
+            <View style={styles.formCard}>
+              <Text style={styles.formTitle}>Payment method</Text>
+              <PaymentOption
+                active={details.payment === 'cash'}
+                icon="truck"
+                label="Cash on delivery"
+                onPress={() => update('payment', 'cash')}
+                subtitle="Record the order now; payment happens at delivery"
+              />
+              <PaymentOption
+                active={details.payment === 'card'}
+                icon="credit-card"
+                label="Credit or debit card"
+                onPress={() => update('payment', 'card')}
+                subtitle="Demo card form — no charge is made"
+              />
+              {details.payment === 'card' ? (
+                <>
+                  <View style={styles.demoNotice}>
+                    <Icon name="shield" color="#77601A" size={18} />
+                    <Text style={styles.demoNoticeText}>
+                      Demo only. Use sample number 4242 4242 4242 4242. Card
+                      fields are never saved or sent.
+                    </Text>
+                  </View>
+                  <CheckoutField
+                    autoCapitalize="words"
+                    autoComplete="off"
+                    error={paymentAttempted ? cardErrors.cardholder : undefined}
+                    testID="card-holder"
+                    label="Name on card"
+                    onChangeText={value => updateCard('cardholder', value)}
+                    placeholder="Demo cardholder"
+                    value={card.cardholder}
+                  />
+                  <CheckoutField
+                    autoComplete="off"
+                    error={paymentAttempted ? cardErrors.number : undefined}
+                    testID="card-number"
+                    keyboardType="number-pad"
+                    label="Card number"
+                    maxLength={19}
+                    onChangeText={value => {
+                      const digits = value.replace(/\D/g, '').slice(0, 16);
+                      updateCard(
+                        'number',
+                        digits.replace(/(\d{4})(?=\d)/g, '$1 '),
+                      );
+                    }}
+                    placeholder="4242 4242 4242 4242"
+                    value={card.number}
+                  />
+                  <View style={styles.cardRow}>
+                    <View style={styles.cardHalf}>
+                      <CheckoutField
+                        autoComplete="off"
+                        error={paymentAttempted ? cardErrors.expiry : undefined}
+                        testID="card-expiry"
+                        keyboardType="number-pad"
+                        label="Expiry"
+                        maxLength={5}
+                        onChangeText={value => {
+                          const digits = value.replace(/\D/g, '').slice(0, 4);
+                          updateCard(
+                            'expiry',
+                            digits.length > 2
+                              ? `${digits.slice(0, 2)}/${digits.slice(2)}`
+                              : digits,
+                          );
+                        }}
+                        placeholder="MM/YY"
+                        value={card.expiry}
+                      />
+                    </View>
+                    <View style={styles.cardHalf}>
+                      <CheckoutField
+                        autoComplete="off"
+                        error={paymentAttempted ? cardErrors.cvv : undefined}
+                        testID="card-cvv"
+                        keyboardType="number-pad"
+                        label="CVV"
+                        maxLength={4}
+                        onChangeText={value =>
+                          updateCard(
+                            'cvv',
+                            value.replace(/\D/g, '').slice(0, 4),
+                          )
+                        }
+                        placeholder="123"
+                        secureTextEntry
+                        value={card.cvv}
+                      />
+                    </View>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.demoNotice}>
+                  <Icon name="info" color="#77601A" size={18} />
+                  <Text style={styles.demoNoticeText}>
+                    Cash on delivery is stored as a demo preference. No seller
+                    or courier receives this order.
+                  </Text>
+                </View>
+              )}
+              {paymentAttempted && !paymentValid ? (
+                <Text style={styles.formError}>
+                  Check the highlighted demo card fields.
+                </Text>
+              ) : null}
+            </View>
+            <View style={styles.checkoutActions}>
+              <Pressable
+                accessibilityRole="button"
+                testID="checkout-back-delivery"
+                onPress={() => changeStep(0)}
+                style={[
+                  sharedStyles.secondaryButton,
+                  styles.checkoutActionButton,
+                ]}
+              >
+                <Text style={sharedStyles.secondaryButtonText}>Back</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                testID="checkout-review-order"
+                onPress={() => {
+                  setPaymentAttempted(true);
+                  if (paymentValid) changeStep(2);
+                }}
+                style={[
+                  sharedStyles.primaryButton,
+                  styles.checkoutActionButton,
+                ]}
+              >
+                <Text style={sharedStyles.primaryButtonText}>Review order</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : null}
+
+        {step === 2 ? (
+          <>
+            <View style={styles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <Text style={styles.reviewTitle}>Delivery</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit delivery details"
+                  onPress={() => changeStep(0)}
+                  style={styles.editLink}
+                >
+                  <Text style={styles.editLinkText}>Edit</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.reviewStrong}>{details.fullName}</Text>
+              <Text style={styles.reviewText}>{details.phone}</Text>
+              <Text style={styles.reviewText}>
+                {details.address}, {details.city}
+              </Text>
+            </View>
+            <View style={styles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <Text style={styles.reviewTitle}>Payment</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Edit payment method"
+                  onPress={() => changeStep(1)}
+                  style={styles.editLink}
+                >
+                  <Text style={styles.editLinkText}>Edit</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.reviewStrong}>
+                {details.payment === 'cash'
+                  ? 'Cash on delivery'
+                  : `Demo card ending ${card.number
+                      .replace(/\D/g, '')
+                      .slice(-4)}`}
+              </Text>
+              <Text style={styles.reviewText}>
+                No charge is processed in this local demo.
+              </Text>
+            </View>
+            <CheckoutSummary
+              cart={cart}
+              couponCode={couponCode}
+              discount={discount}
+              lines={lines}
+              shipping={shipping}
+              subtotal={subtotal}
+              total={total}
+            />
+            <View style={styles.checkoutActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => changeStep(1)}
+                style={[
+                  sharedStyles.secondaryButton,
+                  styles.checkoutActionButton,
+                ]}
+              >
+                <Text style={sharedStyles.secondaryButtonText}>Back</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                testID="place-order"
+                disabled={submitting || !lines.length}
+                accessibilityState={{
+                  disabled: submitting || !lines.length,
+                  busy: submitting,
+                }}
+                onPress={async () => {
+                  setSubmitting(true);
+                  try {
+                    await onPlaceOrder(details);
+                  } finally {
+                    setSubmitting(false);
+                  }
+                }}
+                style={({ pressed }) => [
+                  sharedStyles.primaryButton,
+                  styles.checkoutActionButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={sharedStyles.primaryButtonText}>
+                  {submitting ? 'Saving your order…' : 'Place Demo Order'}
+                </Text>
+              </Pressable>
+            </View>
+            <Text style={styles.secureText}>
+              By placing this demo order, you save a local order summary only.
+              No payment or shipment is initiated.
+            </Text>
+          </>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+function CheckoutSummary({
+  cart,
+  couponCode,
+  discount,
+  lines,
+  shipping,
+  subtotal,
+  total,
+}: {
+  cart: CartQuantities;
+  couponCode: string;
+  discount: number;
+  lines: Product[];
+  shipping: number;
+  subtotal: number;
+  total: number;
+}) {
+  return (
+    <View style={styles.summaryCard}>
+      <Text style={styles.summaryTitle}>Your order</Text>
+      {lines.map(product => (
+        <View key={product.id} style={styles.checkoutLine}>
+          <Text numberOfLines={1} style={styles.checkoutLineName}>
+            {cart[product.id]} × {product.name}
+          </Text>
+          <Text style={styles.checkoutLinePrice}>
+            {money(product.price * cart[product.id])}
+          </Text>
+        </View>
+      ))}
+      <View style={styles.summaryDivider} />
+      <SummaryRow label="Subtotal" value={money(subtotal)} />
+      {couponCode ? (
+        <SummaryRow
+          label={`Discount (${couponCode})`}
+          positive
+          value={`−${money(discount)}`}
+        />
+      ) : null}
+      <SummaryRow
+        label="Shipping"
+        positive={shipping === 0}
+        value={shipping === 0 ? 'FREE' : money(shipping)}
+      />
+      <SummaryRow bold label="Order total" value={money(total)} />
+    </View>
   );
 }
 
 function CheckoutField({
   label,
   error,
+  maxLength = 200,
   ...props
 }: React.ComponentProps<typeof TextInput> & {
   label: string;
@@ -510,7 +788,7 @@ function CheckoutField({
       <TextInput
         {...props}
         accessibilityLabel={label}
-        maxLength={200}
+        maxLength={maxLength}
         placeholderTextColor="#98A1A6"
         style={[sharedStyles.input, !!error && styles.inputError]}
       />
@@ -859,8 +1137,54 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: COLORS.teal,
   },
-  demoNotice: { padding: 11, borderRadius: 12, backgroundColor: '#FFF7DD' },
-  demoNoticeText: { color: '#77601A', fontSize: 10, lineHeight: 15 },
+  demoNotice: {
+    padding: 11,
+    borderRadius: 12,
+    backgroundColor: '#FFF7DD',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    marginBottom: 14,
+  },
+  demoNoticeText: {
+    flex: 1,
+    color: '#77601A',
+    fontSize: 10,
+    lineHeight: 15,
+  },
+  cardRow: { flexDirection: 'row', gap: 12 },
+  cardHalf: { flex: 1 },
+  checkoutActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 4,
+  },
+  checkoutActionButton: { flex: 1 },
+  reviewCard: {
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 19,
+    backgroundColor: COLORS.white,
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  reviewTitle: { color: COLORS.ink, fontSize: 16, fontWeight: '900' },
+  editLink: { minWidth: 44, minHeight: 36, alignItems: 'flex-end' },
+  editLinkText: { color: COLORS.teal, fontSize: 12, fontWeight: '900' },
+  reviewStrong: { color: COLORS.ink, fontSize: 13, fontWeight: '900' },
+  reviewText: {
+    color: COLORS.muted,
+    fontSize: 11,
+    lineHeight: 18,
+    marginTop: 3,
+  },
   checkoutLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -7,7 +7,7 @@
 - Trang chủ, danh mục sản phẩm, tìm kiếm, lọc và sắp xếp.
 - Chi tiết sản phẩm, sản phẩm yêu thích và giỏ hàng có kiểm tra tồn kho.
 - Mã ưu đãi `SELLZY10` giảm 10% giá trị sản phẩm.
-- Checkout có kiểm tra thông tin giao hàng, lưu đơn hàng và hỗ trợ thêm lại sản phẩm từ đơn cũ.
+- Checkout 3 bước (giao hàng, thanh toán, kiểm tra đơn), có form thẻ demo không lưu dữ liệu thẻ; lưu đơn hàng cục bộ và hỗ trợ thêm lại sản phẩm từ đơn cũ.
 - Hồ sơ khách hàng, danh sách nhà bán và bản nháp đăng ký nhà bán.
 - Dữ liệu giỏ hàng, yêu thích, hồ sơ, đơn hàng và bản nháp được lưu bằng AsyncStorage.
 

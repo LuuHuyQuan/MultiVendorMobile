@@ -53,6 +53,13 @@ export type CustomerDetails = {
   payment: 'cash' | 'card';
 };
 
+export type DemoCardDetails = {
+  cardholder: string;
+  number: string;
+  expiry: string;
+  cvv: string;
+};
+
 export type RouteName =
   | 'home'
   | 'shop'

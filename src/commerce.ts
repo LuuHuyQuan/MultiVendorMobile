@@ -2,6 +2,7 @@ import { products } from './data/catalog';
 import type {
   CartQuantities,
   CustomerDetails,
+  DemoCardDetails,
   Order,
   OrderLine,
 } from './types';
@@ -87,6 +88,41 @@ export function validateDelivery(
   if (details.payment !== 'cash' && details.payment !== 'card')
     errors.payment = 'Choose a payment method.';
   return errors;
+}
+
+export function validateDemoCard(
+  card: DemoCardDetails,
+): Partial<Record<keyof DemoCardDetails, string>> {
+  const errors: Partial<Record<keyof DemoCardDetails, string>> = {};
+  const digits = card.number.replace(/\D/g, '');
+  if (card.cardholder.trim().length < 2) {
+    errors.cardholder = 'Enter the cardholder name.';
+  }
+  if (!/^\d{16}$/.test(digits) || !passesLuhn(digits)) {
+    errors.number = 'Enter a valid 16-digit demo card number.';
+  }
+  if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(card.expiry.trim())) {
+    errors.expiry = 'Use MM/YY.';
+  }
+  if (!/^\d{3,4}$/.test(card.cvv.trim())) {
+    errors.cvv = 'Use 3 or 4 digits.';
+  }
+  return errors;
+}
+
+function passesLuhn(value: string) {
+  let sum = 0;
+  let double = false;
+  for (let index = value.length - 1; index >= 0; index -= 1) {
+    let digit = Number(value[index]);
+    if (double) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+    double = !double;
+  }
+  return sum % 10 === 0;
 }
 
 export function createOrder(
