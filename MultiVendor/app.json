@@ -1,11 +1,4 @@
 {
-  "expo": {
-    "name": "Sellzy",
-    "slug": "sellzy-multivendor",
-    "version": "1.0.0",
-    "web": {
-      "bundler": "metro",
-      "output": "single"
-    }
-  }
+  "name": "MultiVendor",
+  "displayName": "Sellzy"
 }

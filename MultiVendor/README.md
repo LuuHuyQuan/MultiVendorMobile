@@ -1,6 +1,6 @@
-# Sellzy Expo
+# Sellzy Mobile
 
-Ứng dụng mua sắm đa nhà bán chạy bằng Expo SDK 57 và React Native Web, dựa trên giao diện tham khảo [Sellzy HTML](https://sellzy-html.vercel.app/).
+Ứng dụng mua sắm đa nhà bán được xây dựng bằng React Native CLI 0.87, dựa trên giao diện tham khảo [Sellzy HTML](https://sellzy-html.vercel.app/).
 
 ## Tính năng
 
@@ -14,12 +14,14 @@
 
 ## Phạm vi bản demo
 
-Đây là ứng dụng demo chạy cục bộ. Danh mục được đóng gói trong ứng dụng; chưa có máy chủ, xác thực tài khoản thật, cổng thanh toán, vận chuyển, thông báo đẩy, hỗ trợ trực tuyến hoặc quy trình duyệt nhà bán. Đăng nhập hiện là mô phỏng cục bộ và không lưu mật khẩu. Thao tác **Place Demo Order** chỉ lưu đơn trong trình duyệt, không thu tiền và không tạo vận đơn.
+Đây là ứng dụng demo chạy cục bộ. Danh mục được đóng gói trong ứng dụng; chưa có máy chủ, xác thực tài khoản thật, cổng thanh toán, vận chuyển, thông báo đẩy, hỗ trợ trực tuyến hoặc quy trình duyệt nhà bán. Đăng nhập hiện là mô phỏng cục bộ và không lưu mật khẩu. Thao tác **Place Demo Order** chỉ lưu đơn trên thiết bị, không thu tiền và không tạo vận đơn.
 
 ## Yêu cầu phát triển
 
-- Node.js `>= 22.13.0` và npm.
-- Trình duyệt hiện đại như Chrome hoặc Edge.
+- Node.js `>= 22.11.0` và npm.
+- JDK 17.
+- Android Studio cùng Android SDK để chạy Android.
+- macOS cùng Xcode và CocoaPods để chạy iOS.
 
 ## Chạy ứng dụng
 
@@ -29,13 +31,13 @@ npm ci
 npm start
 ```
 
-Expo sẽ tự mở bản web trong trình duyệt. Có thể chạy lệnh tương đương:
+Mở terminal thứ hai trong thư mục `MultiVendor` để chạy Android:
 
 ```powershell
-npm run web
+npm run android
 ```
 
-Không cần Android Studio, emulator hay kết nối điện thoại để phát triển và xem bản web.
+Trên macOS, chạy iOS bằng lệnh `npm run ios`.
 
 ## Kiểm tra
 
@@ -45,13 +47,14 @@ npm run lint
 npx tsc --noEmit
 ```
 
-## Xuất bản web tĩnh
+## Tạo APK Android
 
 ```powershell
-npm run export:web
+cd android
+.\gradlew.bat :app:assembleDebug
 ```
 
-Kết quả được tạo trong thư mục `dist/` và có thể đưa lên dịch vụ hosting tĩnh.
+APK debug được tạo tại `android/app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Nguồn tham khảo
 
