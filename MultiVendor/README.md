@@ -1,6 +1,6 @@
 # Sellzy Mobile
 
-Ứng dụng mua sắm đa nhà bán được xây dựng bằng React Native CLI 0.87, dựa trên giao diện tham khảo [Sellzy HTML](https://sellzy-html.vercel.app/).
+Ứng dụng mua sắm đa nhà bán được xây dựng bằng React Native CLI 0.86 và tích hợp Expo Modules theo bare workflow, dựa trên giao diện tham khảo [Sellzy HTML](https://sellzy-html.vercel.app/).
 
 ## Tính năng
 
@@ -38,6 +38,16 @@ npm run android
 ```
 
 Trên macOS, chạy iOS bằng lệnh `npm run ios`.
+
+Expo được tích hợp bổ sung theo bare workflow, không thay thế các dự án native.
+Có thể khởi động Expo CLI bằng:
+
+```powershell
+npm run start:expo
+```
+
+Để biên dịch bằng Expo CLI nhưng vẫn dùng trực tiếp thư mục `android`/`ios`, dùng
+`npm run android:expo` hoặc `npm run ios:expo`.
 
 ## Kiểm tra
 

@@ -39,6 +39,9 @@ yarn-error.log*
 .metro-health-check*
 coverage/
 
+# Expo
+.expo/
+
 # Ruby / CocoaPods
 **/Pods/
 /vendor/bundle/

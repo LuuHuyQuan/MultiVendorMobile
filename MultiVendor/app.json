@@ -1,4 +1,6 @@
 {
   "name": "MultiVendor",
-  "displayName": "Sellzy"
+  "slug": "sellzy-multivendor",
+  "version": "1.0.0",
+  "platforms": ["android", "ios"]
 }
