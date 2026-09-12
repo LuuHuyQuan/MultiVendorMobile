@@ -40,11 +40,13 @@ npm run android
 Trên macOS, chạy iOS bằng lệnh `npm run ios`.
 
 Expo được tích hợp bổ sung theo bare workflow, không thay thế các dự án native.
-Có thể khởi động Expo CLI bằng:
+Có thể khởi động trực tiếp bản web bằng Expo CLI:
 
 ```powershell
 npm run start:expo
 ```
+
+Để mở Expo CLI cho Android/iOS, dùng `npm run start:expo:native`.
 
 Để biên dịch bằng Expo CLI nhưng vẫn dùng trực tiếp thư mục `android`/`ios`, dùng
 `npm run android:expo` hoặc `npm run ios:expo`.
