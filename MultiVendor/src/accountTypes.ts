@@ -40,6 +40,6 @@ export const emptyVendorDraft: VendorDraft = {
   storeName: '',
   ownerName: '',
   email: '',
-  category: 'Wellness',
+  category: 'Sống khỏe',
   description: '',
 };

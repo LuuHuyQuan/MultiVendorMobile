@@ -1,19 +1,24 @@
 import { Product } from '../types';
 
 export const categories = [
-  { id: 'All', label: 'All Items', icon: '✦', tint: '#E7F7F5' },
-  { id: 'Vitamins', label: 'Vitamins', icon: 'V', tint: '#FFF5D2' },
-  { id: 'Personal Care', label: 'Personal Care', icon: '+', tint: '#EAF1FF' },
-  { id: 'Wellness', label: 'Wellness', icon: 'W', tint: '#F1EAFE' },
-  { id: 'Devices', label: 'Devices', icon: '⌁', tint: '#FFECEA' },
-  { id: 'Nutrition', label: 'Nutrition', icon: 'N', tint: '#EAF8E9' },
+  { id: 'All', label: 'Tất cả', icon: '✦', tint: '#E7F7F5' },
+  { id: 'Vitamins', label: 'Vitamin', icon: 'V', tint: '#FFF5D2' },
+  {
+    id: 'Personal Care',
+    label: 'Chăm sóc cá nhân',
+    icon: '+',
+    tint: '#EAF1FF',
+  },
+  { id: 'Wellness', label: 'Sống khỏe', icon: 'W', tint: '#F1EAFE' },
+  { id: 'Devices', label: 'Thiết bị', icon: '⌁', tint: '#FFECEA' },
+  { id: 'Nutrition', label: 'Dinh dưỡng', icon: 'N', tint: '#EAF8E9' },
 ];
 
 export const products: Product[] = [
   {
     id: 'vitamin-c-1000',
-    name: 'VitaLife Vitamin C 1000mg Immunity Support',
-    store: 'VitaLife Store',
+    name: 'Viên Vitamin C VitaLife 1000mg hỗ trợ miễn dịch',
+    store: 'Cửa hàng VitaLife',
     category: 'Vitamins',
     image: require('../assets/vitamin-c.png'),
     price: 27.49,
@@ -23,13 +28,13 @@ export const products: Product[] = [
     discount: 31,
     stock: 42,
     description:
-      'A high-strength daily vitamin C formula designed to support immune health, energy and antioxidant protection.',
-    benefits: ['1000mg vitamin C', 'Easy-to-take formula', '30-day supply'],
+      'Công thức vitamin C hàm lượng cao dùng hằng ngày, hỗ trợ miễn dịch, năng lượng và chống oxy hóa.',
+    benefits: ['Vitamin C 1000mg', 'Dễ sử dụng', 'Dùng trong 30 ngày'],
   },
   {
     id: 'kids-vitamin-c',
-    name: "Renzo's Vitamins for Kids — Bright & Healthy",
-    store: 'Family Health',
+    name: 'Vitamin C Renzo cho trẻ em – khỏe mạnh mỗi ngày',
+    store: 'Sức khỏe gia đình',
     category: 'Vitamins',
     image: require('../assets/vitamin-c-2.png'),
     price: 18.9,
@@ -39,13 +44,13 @@ export const products: Product[] = [
     discount: 24,
     stock: 25,
     description:
-      'Kid-friendly vitamin C with a bright citrus taste and no artificial colors. Made for everyday immune support.',
-    benefits: ['Made for kids', '60 tablets', 'No artificial colors'],
+      'Vitamin C vị cam dễ dùng cho trẻ nhỏ, không phẩm màu nhân tạo, hỗ trợ miễn dịch mỗi ngày.',
+    benefits: ['Dành cho trẻ em', '60 viên', 'Không phẩm màu nhân tạo'],
   },
   {
     id: 'hand-sanitizer',
-    name: 'PureGuard Moisturizing Hand Sanitizer',
-    store: 'Care & Clean',
+    name: 'Dung dịch rửa tay khô PureGuard dưỡng ẩm',
+    store: 'Chăm sóc & Sạch',
     category: 'Personal Care',
     image: require('../assets/hand-sanitizer-1.png'),
     price: 9.75,
@@ -55,12 +60,12 @@ export const products: Product[] = [
     discount: 22,
     stock: 70,
     description:
-      'A quick-drying sanitizer that helps clean hands while aloe and vitamin E keep skin feeling soft.',
-    benefits: ['70% alcohol', 'Aloe enriched', 'Travel friendly'],
+      'Dung dịch khô nhanh giúp làm sạch tay, kết hợp lô hội và vitamin E để da luôn mềm mại.',
+    benefits: ['70% cồn', 'Giàu lô hội', 'Tiện mang theo'],
   },
   {
     id: 'skin-combat',
-    name: 'Combat Daily Defense Skincare Cream',
+    name: 'Kem dưỡng da Combat Daily Defense',
     store: 'Glow Lab',
     category: 'Personal Care',
     image: require('../assets/combat.png'),
@@ -71,13 +76,13 @@ export const products: Product[] = [
     discount: 24,
     stock: 18,
     description:
-      'A lightweight daily cream that supports the skin barrier and locks in lasting moisture without a greasy finish.',
-    benefits: ['Dermatologist tested', 'All skin types', 'Fast absorbing'],
+      'Kem dưỡng nhẹ mặt giúp củng cố hàng rào bảo vệ da và khóa ẩm lâu dài mà không gây nhờn rít.',
+    benefits: ['Đã kiểm nghiệm da liễu', 'Phù hợp mọi loại da', 'Thấm nhanh'],
   },
   {
     id: 'vitamin-b12',
-    name: 'VitaLife B12 Energy & Focus Tablets',
-    store: 'VitaLife Store',
+    name: 'Viên Vitamin B12 VitaLife tăng năng lượng và tập trung',
+    store: 'Cửa hàng VitaLife',
     category: 'Wellness',
     image: require('../assets/vitamin-b12.png'),
     price: 16.25,
@@ -87,13 +92,13 @@ export const products: Product[] = [
     discount: 23,
     stock: 37,
     description:
-      'A convenient B12 supplement formulated to support normal energy metabolism and daily focus.',
-    benefits: ['High potency B12', '90 tablets', 'Vegetarian formula'],
+      'Thực phẩm bổ sung B12 tiện lợi, hỗ trợ chuyển hóa năng lượng bình thường và khả năng tập trung hằng ngày.',
+    benefits: ['B12 hàm lượng cao', '90 viên', 'Công thức chay'],
   },
   {
     id: 'apple-juice',
-    name: 'Organic Apple Juice Daily Wellness Pack',
-    store: 'Natural Choice',
+    name: 'Nước ép táo hữu cơ cho sức khỏe hằng ngày',
+    store: 'Lựa chọn tự nhiên',
     category: 'Nutrition',
     image: require('../assets/apple-juice.png'),
     price: 12.4,
@@ -103,13 +108,13 @@ export const products: Product[] = [
     discount: 25,
     stock: 54,
     description:
-      'Refreshing organic apple juice made from carefully selected fruit with no added sugar or artificial flavor.',
-    benefits: ['Certified organic', 'No added sugar', 'Family pack'],
+      'Nước ép táo hữu cơ tươi mát từ trái cây tuyển chọn, không thêm đường hoặc hương liệu nhân tạo.',
+    benefits: ['Chứng nhận hữu cơ', 'Không thêm đường', 'Gói gia đình'],
   },
   {
     id: 'thermometer',
-    name: 'Digital Infrared Thermometer — Instant Read',
-    store: 'Care Devices',
+    name: 'Nhiệt kế hồng ngoại kỹ thuật số – đo nhanh',
+    store: 'Thiết bị chăm sóc',
     category: 'Devices',
     image: require('../assets/temperature-gun-2.png'),
     price: 34.2,
@@ -119,13 +124,13 @@ export const products: Product[] = [
     discount: 19,
     stock: 16,
     description:
-      'Fast, contactless temperature readings with a clear display, memory recall and fever alert.',
-    benefits: ['One-second reading', 'Silent mode', 'Memory recall'],
+      'Đo nhiệt độ nhanh không chạm với màn hình rõ nét, ghi nhớ kết quả và cảnh báo sốt.',
+    benefits: ['Đo trong 1 giây', 'Chế độ im lặng', 'Lưu kết quả'],
   },
   {
     id: 'bp-monitor',
-    name: 'Smart Upper Arm Blood Pressure Monitor',
-    store: 'Care Devices',
+    name: 'Máy đo huyết áp bắp tay thông minh',
+    store: 'Thiết bị chăm sóc',
     category: 'Devices',
     image: require('../assets/bp-machine.png'),
     price: 49.9,
@@ -135,13 +140,13 @@ export const products: Product[] = [
     discount: 23,
     stock: 12,
     description:
-      'An easy home blood-pressure monitor with a large display, irregular heartbeat detection and two-user memory.',
-    benefits: ['Large display', 'Two-user memory', 'Comfort cuff'],
+      'Máy đo huyết áp tại nhà dễ dùng với màn hình lớn, phát hiện nhịp tim không đều và bộ nhớ cho hai người.',
+    benefits: ['Màn hình lớn', 'Bộ nhớ 2 người dùng', 'Vòng bít êm ái'],
   },
   {
     id: 'omega-3',
-    name: 'VitaLife Omega-3 Softgels Heart Support',
-    store: 'VitaLife Store',
+    name: 'Viên Omega-3 VitaLife hỗ trợ tim mạch',
+    store: 'Cửa hàng VitaLife',
     category: 'Wellness',
     image: require('../assets/aooca.png'),
     price: 31.5,
@@ -151,13 +156,13 @@ export const products: Product[] = [
     discount: 21,
     stock: 31,
     description:
-      'Purified omega-3 softgels with EPA and DHA to complement a balanced lifestyle and support heart health.',
-    benefits: ['EPA + DHA', 'Purified fish oil', '60 softgels'],
+      'Viên nang mềm omega-3 tinh khiết với EPA và DHA, bổ sung cho lối sống cân bằng và hỗ trợ sức khỏe tim mạch.',
+    benefits: ['EPA + DHA', 'Dầu cá tinh khiết', '60 viên nang mềm'],
   },
   {
     id: 'groundnut-oil',
-    name: 'Cold Pressed Groundnut Cooking Oil',
-    store: 'Natural Choice',
+    name: 'Dầu lạc ép lạnh dùng trong nấu ăn',
+    store: 'Lựa chọn tự nhiên',
     category: 'Nutrition',
     image: require('../assets/ground-nuts-oil.png'),
     price: 14.8,
@@ -167,16 +172,16 @@ export const products: Product[] = [
     discount: 18,
     stock: 45,
     description:
-      'Naturally cold-pressed groundnut oil with a rich aroma, suitable for everyday cooking and dressings.',
-    benefits: ['Cold pressed', 'No preservatives', 'Naturally aromatic'],
+      'Dầu lạc ép lạnh tự nhiên với hương thơm đậm đà, phù hợp cho bữa ăn và các món trộn hằng ngày.',
+    benefits: ['Ép lạnh', 'Không chất bảo quản', 'Hương thơm tự nhiên'],
   },
 ];
 
 export const sellers = [
-  { name: 'VitaLife Store', rating: 4.9, products: 128, color: '#E7F7F5' },
-  { name: 'Family Health', rating: 4.8, products: 84, color: '#FFF5D2' },
-  { name: 'Care Devices', rating: 4.7, products: 67, color: '#EAF1FF' },
-  { name: 'Natural Choice', rating: 4.6, products: 102, color: '#EAF8E9' },
+  { name: 'Cửa hàng VitaLife', rating: 4.9, products: 128, color: '#E7F7F5' },
+  { name: 'Sức khỏe gia đình', rating: 4.8, products: 84, color: '#FFF5D2' },
+  { name: 'Thiết bị chăm sóc', rating: 4.7, products: 67, color: '#EAF1FF' },
+  { name: 'Lựa chọn tự nhiên', rating: 4.6, products: 102, color: '#EAF8E9' },
 ];
 
 export const getProduct = (id?: string) =>

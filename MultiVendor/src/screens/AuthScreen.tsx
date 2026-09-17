@@ -37,8 +37,8 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function getFriendlyError(error: unknown, mode: AuthMode) {
   const fallback =
     mode === 'login'
-      ? "We couldn't sign you in. Please try again."
-      : "We couldn't create your account. Please try again.";
+      ? 'Khong the dang nhap. Vui long thu lai.'
+      : 'Khong the tao tai khoan. Vui long thu lai.';
 
   if (!(error instanceof Error)) return fallback;
 
@@ -50,7 +50,7 @@ function getFriendlyError(error: unknown, mode: AuthMode) {
     lowerMessage.includes('offline') ||
     lowerMessage.includes('failed to fetch')
   ) {
-    return 'Check your internet connection, then try again.';
+    return 'Kiem tra ket noi internet roi thu lai.';
   }
 
   if (
@@ -59,7 +59,7 @@ function getFriendlyError(error: unknown, mode: AuthMode) {
       lowerMessage.includes('credential') ||
       lowerMessage.includes('401'))
   ) {
-    return 'That email or password does not look right.';
+    return 'Email hoac mat khau chua chinh xac.';
   }
 
   if (
@@ -69,10 +69,10 @@ function getFriendlyError(error: unknown, mode: AuthMode) {
       lowerMessage.includes('conflict') ||
       lowerMessage.includes('409'))
   ) {
-    return 'An account with that email already exists.';
+    return 'Email nay da duoc dang ky.';
   }
 
-  return message && message.length <= 180 ? message : fallback;
+  return fallback;
 }
 
 export function AuthScreen({
@@ -120,22 +120,22 @@ export function AuthScreen({
 
     if (mode === 'register') {
       if (!cleanName) {
-        nextErrors.fullName = 'Please enter your full name.';
+        nextErrors.fullName = 'Vui long nhap ho va ten.';
       } else if (cleanName.length < 2) {
-        nextErrors.fullName = 'Your name needs at least 2 characters.';
+        nextErrors.fullName = 'Ho ten can co it nhat 2 ky tu.';
       }
     }
 
     if (!cleanEmail) {
-      nextErrors.email = 'Please enter your email address.';
+      nextErrors.email = 'Vui long nhap dia chi email.';
     } else if (!emailPattern.test(cleanEmail)) {
-      nextErrors.email = 'Enter a valid email address.';
+      nextErrors.email = 'Nhap dia chi email hop le.';
     }
 
     if (!password) {
-      nextErrors.password = 'Please enter your password.';
+      nextErrors.password = 'Vui long nhap mat khau.';
     } else if (mode === 'register' && password.length < 8) {
-      nextErrors.password = 'Password must be at least 8 characters.';
+      nextErrors.password = 'Mat khau can co it nhat 8 ky tu.';
     }
 
     setErrors(nextErrors);
@@ -163,11 +163,11 @@ export function AuthScreen({
     }
   };
 
-  const title = mode === 'login' ? 'Welcome back' : 'Join Sellzy';
+  const title = mode === 'login' ? 'Chao mung tro lai' : 'Tao tai khoan Sellzy';
   const subtitle =
     mode === 'login'
-      ? 'Sign in to keep your account details close at hand.'
-      : 'Create an account for a smoother shopping experience.';
+      ? 'Dang nhap de quan ly thong tin mua sam cua ban.'
+      : 'Tao tai khoan de mua sam thuan tien hon.';
 
   return (
     <KeyboardAvoidingView
@@ -197,8 +197,8 @@ export function AuthScreen({
           >
             <View style={styles.heroTopRow}>
               <Pressable
-                accessibilityHint="Continue shopping without signing in"
-                accessibilityLabel="Go back"
+                accessibilityHint="Tiep tuc mua sam ma khong can dang nhap"
+                accessibilityLabel="Quay lai"
                 accessibilityRole="button"
                 hitSlop={8}
                 onPress={onBack}
@@ -221,7 +221,9 @@ export function AuthScreen({
 
             <View style={styles.heroCopy}>
               <Text style={styles.eyebrow}>
-                {mode === 'login' ? 'GOOD TO SEE YOU' : 'SHOP YOUR WAY'}
+                {mode === 'login'
+                  ? 'RAT VUI KHI GAP LAI'
+                  : 'MUA SAM THEO CACH CUA BAN'}
               </Text>
               <Text accessibilityRole="header" style={styles.heroTitle}>
                 {title}
@@ -237,26 +239,26 @@ export function AuthScreen({
               <ModeButton
                 active={mode === 'login'}
                 disabled={loading}
-                label="Sign in"
+                label="Dang nhap"
                 onPress={() => changeMode('login')}
                 testID="auth-mode-login"
               />
               <ModeButton
                 active={mode === 'register'}
                 disabled={loading}
-                label="Register"
+                label="Dang ky"
                 onPress={() => changeMode('register')}
                 testID="auth-mode-register"
               />
             </View>
 
             <Text style={styles.formTitle}>
-              {mode === 'login' ? 'Sign in to your account' : 'Create account'}
+              {mode === 'login' ? 'Dang nhap tai khoan' : 'Tao tai khoan'}
             </Text>
             <Text style={styles.formSubtitle}>
               {mode === 'login'
-                ? 'Enter your details below to continue.'
-                : 'A few details and you are ready to go.'}
+                ? 'Nhap thong tin ben duoi de tiep tuc.'
+                : 'Chi can vai thong tin la ban co the bat dau.'}
             </Text>
 
             {mode === 'register' ? (
@@ -266,13 +268,13 @@ export function AuthScreen({
                 editable={!loading}
                 error={errors.fullName}
                 icon="user"
-                label="Full name"
+                label="Ho va ten"
                 onChangeText={value => {
                   setFullName(value);
                   clearFieldError('fullName');
                 }}
                 onSubmitEditing={() => emailInput.current?.focus()}
-                placeholder="Your full name"
+                placeholder="Nhap ho va ten"
                 returnKeyType="next"
                 testID="auth-full-name"
                 textContentType="name"
@@ -288,7 +290,7 @@ export function AuthScreen({
               icon="mail"
               inputRef={emailInput}
               keyboardType="email-address"
-              label="Email address"
+              label="Dia chi email"
               onChangeText={value => {
                 setEmail(value);
                 clearFieldError('email');
@@ -310,14 +312,14 @@ export function AuthScreen({
               error={errors.password}
               icon="shield"
               inputRef={passwordInput}
-              label="Password"
+              label="Mat khau"
               onChangeText={value => {
                 setPassword(value);
                 clearFieldError('password');
               }}
               onSubmitEditing={submit}
               placeholder={
-                mode === 'register' ? 'At least 8 characters' : 'Your password'
+                mode === 'register' ? 'It nhat 8 ky tu' : 'Nhap mat khau'
               }
               returnKeyType="done"
               secureTextEntry={!showPassword}
@@ -327,7 +329,7 @@ export function AuthScreen({
             >
               <Pressable
                 accessibilityLabel={
-                  showPassword ? 'Hide password' : 'Show password'
+                  showPassword ? 'An mat khau' : 'Hien mat khau'
                 }
                 accessibilityRole="button"
                 hitSlop={8}
@@ -335,7 +337,7 @@ export function AuthScreen({
                 style={styles.passwordAction}
               >
                 <Text style={styles.passwordActionText}>
-                  {showPassword ? 'Hide' : 'Show'}
+                  {showPassword ? 'An' : 'Hien'}
                 </Text>
               </Pressable>
             </AuthField>
@@ -368,7 +370,7 @@ export function AuthScreen({
               ) : (
                 <>
                   <Text style={styles.submitText}>
-                    {mode === 'login' ? 'Sign in' : 'Create account'}
+                    {mode === 'login' ? 'Dang nhap' : 'Tao tai khoan'}
                   </Text>
                   <Icon color={COLORS.white} name="arrow-right" size={18} />
                 </>
@@ -377,12 +379,12 @@ export function AuthScreen({
 
             <View style={styles.guestDividerRow}>
               <View style={styles.guestDivider} />
-              <Text style={styles.guestDividerText}>NO ACCOUNT NEEDED</Text>
+              <Text style={styles.guestDividerText}>KHONG CAN TAI KHOAN</Text>
               <View style={styles.guestDivider} />
             </View>
 
             <Pressable
-              accessibilityHint="Return to Sellzy and shop without an account"
+              accessibilityHint="Quay ve Sellzy va mua sam khong can tai khoan"
               accessibilityRole="button"
               onPress={onBack}
               style={({ pressed }) => [
@@ -391,12 +393,13 @@ export function AuthScreen({
               ]}
               testID="auth-continue-guest"
             >
-              <Text style={styles.guestButtonText}>Continue as guest</Text>
+              <Text style={styles.guestButtonText}>Tiep tuc voi tu cach khach</Text>
               <Icon color={COLORS.teal} name="chevron-right" size={17} />
             </Pressable>
 
             <Text style={styles.guestNote}>
-              You can browse, save favourites and shop without signing in.
+              Ban van co the xem, luu yeu thich va mua sam ma khong can dang
+              nhap.
             </Text>
           </View>
         </View>
@@ -545,7 +548,7 @@ const styles = StyleSheet.create({
   heroCopy: { marginTop: 30, maxWidth: 470 },
   eyebrow: {
     color: COLORS.yellow,
-    fontSize: 10,
+    fontSize: 11,
     letterSpacing: 1.5,
     fontWeight: '900',
   },
@@ -559,8 +562,8 @@ const styles = StyleSheet.create({
   heroSubtitle: {
     maxWidth: 380,
     color: '#CDE2E0',
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 21,
     marginTop: 8,
   },
   body: {
@@ -600,7 +603,7 @@ const styles = StyleSheet.create({
     boxShadow: '0px 2px 7px rgba(23, 66, 62, 0.10)',
     elevation: 2,
   },
-  modeButtonText: { color: COLORS.muted, fontSize: 13, fontWeight: '800' },
+  modeButtonText: { color: COLORS.muted, fontSize: 14, fontWeight: '800' },
   modeButtonTextActive: { color: COLORS.teal },
   formTitle: {
     color: COLORS.ink,
@@ -611,15 +614,15 @@ const styles = StyleSheet.create({
   },
   formSubtitle: {
     color: COLORS.muted,
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 19,
     marginTop: 4,
     marginBottom: 18,
   },
   field: { marginBottom: 15 },
   label: {
     color: COLORS.ink,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '800',
     marginBottom: 7,
   },
@@ -642,7 +645,7 @@ const styles = StyleSheet.create({
     height: 50,
     paddingVertical: 0,
     color: COLORS.ink,
-    fontSize: 14,
+    fontSize: 15,
   },
   passwordAction: {
     minWidth: 50,
@@ -650,8 +653,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  passwordActionText: { color: COLORS.teal, fontSize: 11, fontWeight: '800' },
-  fieldError: { color: COLORS.red, fontSize: 11, lineHeight: 16, marginTop: 5 },
+  passwordActionText: { color: COLORS.teal, fontSize: 12, fontWeight: '800' },
+  fieldError: { color: COLORS.red, fontSize: 12, lineHeight: 17, marginTop: 5 },
   requestError: {
     padding: 12,
     marginBottom: 14,
@@ -664,8 +667,8 @@ const styles = StyleSheet.create({
   requestErrorText: {
     flex: 1,
     color: COLORS.red,
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 12,
+    lineHeight: 18,
   },
   submitButton: {
     height: 54,
@@ -678,7 +681,7 @@ const styles = StyleSheet.create({
   },
   submitButtonPressed: { backgroundColor: COLORS.tealDark },
   submitButtonDisabled: { opacity: 0.68 },
-  submitText: { color: COLORS.white, fontSize: 14, fontWeight: '900' },
+  submitText: { color: COLORS.white, fontSize: 15, fontWeight: '900' },
   guestDividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -688,7 +691,7 @@ const styles = StyleSheet.create({
   guestDivider: { flex: 1, height: 1, backgroundColor: COLORS.border },
   guestDividerText: {
     color: COLORS.muted,
-    fontSize: 8,
+    fontSize: 10,
     letterSpacing: 0.8,
     fontWeight: '800',
   },
@@ -700,11 +703,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 3,
   },
-  guestButtonText: { color: COLORS.teal, fontSize: 13, fontWeight: '900' },
+  guestButtonText: { color: COLORS.teal, fontSize: 14, fontWeight: '900' },
   guestNote: {
     color: COLORS.muted,
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: 'center',
     paddingHorizontal: 12,
   },

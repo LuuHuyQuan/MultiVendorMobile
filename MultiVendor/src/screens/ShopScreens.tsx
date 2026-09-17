@@ -23,10 +23,10 @@ import { Icon } from '../components/Icon';
 import { AccountDialog } from './AccountForms';
 
 const sorts: { id: SortMode; label: string }[] = [
-  { id: 'popular', label: 'Top rated' },
-  { id: 'price', label: 'Price: Low to high' },
-  { id: 'price-desc', label: 'Price: High to low' },
-  { id: 'discount', label: 'Biggest discount' },
+  { id: 'popular', label: 'Đánh giá cao' },
+  { id: 'price', label: 'Giá: thấp đến cao' },
+  { id: 'price-desc', label: 'Giá: cao đến thấp' },
+  { id: 'discount', label: 'Giảm giá nhiều nhất' },
 ];
 
 type CommonProps = {
@@ -111,6 +111,8 @@ export function ShopScreen({
       return b.rating - a.rating;
     });
   }, [category, query, sortMode, initialStore]);
+  const categoryLabel =
+    categories.find(item => item.id === category)?.label ?? category;
 
   return (
     <View style={[sharedStyles.screen, { paddingTop: topInset }]}>
@@ -119,8 +121,8 @@ export function ShopScreen({
         cartCount={cartCount}
         onBack={onBack}
         onCart={onCart}
-        subtitle={`${visibleProducts.length} products available`}
-        title={initialStore ?? 'Shop'}
+        subtitle={`${visibleProducts.length} sản phẩm đang có`}
+        title={initialStore ?? 'Cửa hàng'}
       />
       <SearchBar
         onChangeText={text => updateFilters({ query: text })}
@@ -140,7 +142,7 @@ export function ShopScreen({
               key={item.id}
               accessibilityRole="button"
               accessibilityState={{ selected: active }}
-              accessibilityLabel={`Category ${item.label}`}
+              accessibilityLabel={`Danh mục ${item.label}`}
               onPress={() => updateFilters({ category: item.id })}
               style={[styles.filterChip, active && styles.filterChipActive]}
             >
@@ -156,14 +158,14 @@ export function ShopScreen({
       <View style={styles.resultRow}>
         <View style={styles.resultCopy}>
           <Text style={styles.resultTitle}>
-            {category === 'All' ? 'All Products' : category}
+            {category === 'All' ? 'Tất cả sản phẩm' : categoryLabel}
           </Text>
           <Text style={styles.resultSubtitle}>
-            {visibleProducts.length} items found
+            {visibleProducts.length} sản phẩm tìm thấy
           </Text>
         </View>
         <Pressable
-          accessibilityLabel="Change product sort"
+          accessibilityLabel="Đổi cách sắp xếp sản phẩm"
           accessibilityRole="button"
           onPress={() => {
             Keyboard.dismiss();
@@ -204,22 +206,25 @@ export function ShopScreen({
         ) : (
           <View style={styles.noResults}>
             <Icon name="search" size={45} color={COLORS.teal} />
-            <Text style={styles.noResultsTitle}>No products found</Text>
+            <Text style={styles.noResultsTitle}>Không tìm thấy sản phẩm</Text>
             <Text style={styles.noResultsText}>
-              Try another keyword or category.
+              Hãy thử từ khóa hoặc danh mục khác.
             </Text>
             <Pressable
               accessibilityRole="button"
               onPress={() => updateFilters({ category: 'All', query: '' })}
               style={styles.resetButton}
             >
-              <Text style={styles.resetLabel}>Clear filters</Text>
+              <Text style={styles.resetLabel}>Xóa bộ lọc</Text>
             </Pressable>
           </View>
         )}
       </ScrollView>
       {showSort ? (
-        <AccountDialog title="Sort products" onClose={() => setShowSort(false)}>
+        <AccountDialog
+          title="Sắp xếp sản phẩm"
+          onClose={() => setShowSort(false)}
+        >
           {sorts.map(item => (
             <Pressable
               key={item.id}
@@ -276,7 +281,7 @@ export function ProductDetailsScreen({
         onBack={onBack}
         onCart={onCart}
         subtitle={product.store}
-        title="Product Details"
+        title="Chi tiết sản phẩm"
       />
       <ScrollView
         contentContainerStyle={styles.detailsContent}
@@ -290,13 +295,13 @@ export function ProductDetailsScreen({
           />
           <View style={styles.detailsDiscount}>
             <Text style={styles.detailsDiscountText}>
-              SAVE {product.discount}%
+              GIẢM {product.discount}%
             </Text>
           </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              liked ? 'Remove from wishlist' : 'Save to wishlist'
+              liked ? 'Bỏ khỏi yêu thích' : 'Lưu vào yêu thích'
             }
             accessibilityState={{ selected: liked }}
             onPress={() => onToggleLike(product.id)}
@@ -316,7 +321,7 @@ export function ProductDetailsScreen({
           <View style={styles.detailsRatingRow}>
             <Text style={styles.detailsStars}>★★★★★</Text>
             <Text style={styles.detailsRating}>
-              {product.rating} · {product.reviews} reviews
+              {product.rating} · {product.reviews} lượt đánh giá
             </Text>
           </View>
           <View style={styles.detailsPriceRow}>
@@ -325,12 +330,12 @@ export function ProductDetailsScreen({
               {money(product.oldPrice)}
             </Text>
             <View style={styles.stockBadge}>
-              <Text style={styles.stockText}>{product.stock} in stock</Text>
+              <Text style={styles.stockText}>Còn {product.stock} sản phẩm</Text>
             </View>
           </View>
 
           <View style={styles.divider} />
-          <Text style={styles.detailsSectionTitle}>About this product</Text>
+          <Text style={styles.detailsSectionTitle}>Thông tin sản phẩm</Text>
           <Text style={styles.description}>{product.description}</Text>
           <View style={styles.benefitList}>
             {product.benefits.map(benefit => (
@@ -347,7 +352,7 @@ export function ProductDetailsScreen({
             <View style={styles.quantityPicker}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Decrease quantity"
+                accessibilityLabel="Giảm số lượng"
                 disabled={quantity <= 1}
                 onPress={() => setQuantity(value => Math.max(1, value - 1))}
                 style={styles.quantityButton}
@@ -361,7 +366,7 @@ export function ProductDetailsScreen({
               <Text style={styles.quantityValue}>{quantity}</Text>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Increase quantity"
+                accessibilityLabel="Tăng số lượng"
                 disabled={quantity >= product.stock}
                 onPress={() =>
                   setQuantity(value => Math.min(product.stock, value + 1))
@@ -377,7 +382,7 @@ export function ProductDetailsScreen({
               onPress={() => onAdd(product.id, quantity)}
               style={styles.addLarge}
             >
-              <Text style={styles.addLargeText}>Add to Cart</Text>
+              <Text style={styles.addLargeText}>Thêm vào giỏ</Text>
             </Pressable>
           </View>
           <Pressable
@@ -388,12 +393,12 @@ export function ProductDetailsScreen({
             }}
             style={styles.buyNow}
           >
-            <Text style={styles.buyNowText}>Buy Now →</Text>
+            <Text style={styles.buyNowText}>Mua ngay →</Text>
           </Pressable>
 
           {related.length ? (
             <>
-              <Text style={styles.relatedTitle}>You may also like</Text>
+              <Text style={styles.relatedTitle}>Có thể bạn cũng thích</Text>
               <ScrollView
                 contentContainerStyle={styles.relatedList}
                 horizontal
@@ -452,7 +457,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   filterChipActive: { borderColor: COLORS.teal, backgroundColor: COLORS.teal },
-  filterText: { color: COLORS.muted, fontSize: 11, fontWeight: '700' },
+  filterText: { color: COLORS.muted, fontSize: 12, fontWeight: '700' },
   filterTextActive: { color: COLORS.white },
   resultRow: {
     paddingHorizontal: 16,
@@ -463,7 +468,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resultTitle: { color: COLORS.ink, fontSize: 20, fontWeight: '900' },
-  resultSubtitle: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
+  resultSubtitle: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
   sortButton: {
     minHeight: 44,
     paddingHorizontal: 12,
@@ -474,7 +479,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 7,
   },
-  sortLabel: { color: COLORS.ink, fontSize: 10, fontWeight: '800' },
+  sortLabel: { color: COLORS.ink, fontSize: 12, fontWeight: '800' },
   sortIcon: { color: COLORS.teal, fontSize: 14, fontWeight: '900' },
   grid: { paddingHorizontal: 11, paddingBottom: 28 },
   gridInner: { flexDirection: 'row', flexWrap: 'wrap' },
@@ -487,7 +492,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: 15,
   },
-  noResultsText: { color: COLORS.muted, fontSize: 13, marginTop: 5 },
+  noResultsText: { color: COLORS.muted, fontSize: 14, marginTop: 5 },
   detailsContent: { paddingBottom: 32 },
   detailsImageWrap: {
     height: 365,
@@ -508,7 +513,7 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: COLORS.red,
   },
-  detailsDiscountText: { color: COLORS.white, fontSize: 9, fontWeight: '900' },
+  detailsDiscountText: { color: COLORS.white, fontSize: 10, fontWeight: '900' },
   detailsLike: {
     position: 'absolute',
     top: 14,
@@ -531,7 +536,7 @@ const styles = StyleSheet.create({
   },
   imageDotActive: { width: 24, backgroundColor: COLORS.teal },
   detailsBody: { paddingHorizontal: 16 },
-  detailsStore: { color: COLORS.teal, fontSize: 12, fontWeight: '800' },
+  detailsStore: { color: COLORS.teal, fontSize: 13, fontWeight: '800' },
   detailsName: {
     color: COLORS.ink,
     fontSize: 25,
@@ -545,7 +550,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   detailsStars: { color: COLORS.yellow, fontSize: 15, letterSpacing: 1 },
-  detailsRating: { color: COLORS.muted, fontSize: 11, marginLeft: 8 },
+  detailsRating: { color: COLORS.muted, fontSize: 12, marginLeft: 8 },
   detailsPriceRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -565,13 +570,13 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#E8F7EE',
   },
-  stockText: { color: COLORS.success, fontSize: 9, fontWeight: '900' },
+  stockText: { color: COLORS.success, fontSize: 11, fontWeight: '900' },
   divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 22 },
-  detailsSectionTitle: { color: COLORS.ink, fontSize: 17, fontWeight: '900' },
+  detailsSectionTitle: { color: COLORS.ink, fontSize: 19, fontWeight: '900' },
   description: {
     color: COLORS.muted,
-    fontSize: 13,
-    lineHeight: 21,
+    fontSize: 14,
+    lineHeight: 22,
     marginTop: 9,
   },
   benefitList: { marginTop: 15, gap: 10 },
@@ -587,7 +592,7 @@ const styles = StyleSheet.create({
   checkText: { color: COLORS.teal, fontSize: 11, fontWeight: '900' },
   benefitLabel: {
     color: COLORS.ink,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     marginLeft: 9,
   },
@@ -609,7 +614,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   quantityButtonText: { color: COLORS.teal, fontSize: 20, fontWeight: '800' },
-  quantityValue: { color: COLORS.ink, fontSize: 15, fontWeight: '900' },
+  quantityValue: { color: COLORS.ink, fontSize: 16, fontWeight: '900' },
   addLarge: {
     flex: 1,
     height: 52,

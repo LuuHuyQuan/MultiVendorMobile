@@ -43,7 +43,7 @@ export function restoreStore(raw: string | null): StoreData {
   if (raw === null) return emptyStore();
   const parsed: unknown = JSON.parse(raw);
   if (!isRecord(parsed) || parsed.version !== 1)
-    throw new Error('Unsupported saved data');
+    throw new Error('Dữ liệu đã lưu không được hỗ trợ.');
   const result = emptyStore();
   const ids = new Set(products.map(product => product.id));
   result.cart = normalizeCart(parsed.cart);

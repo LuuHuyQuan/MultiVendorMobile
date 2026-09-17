@@ -166,7 +166,7 @@ export default function SellzyApp() {
     if (!product) return;
     const existing = dataRef.current.cart[id] ?? 0;
     if (existing >= product.stock) {
-      setToast('You have reached the available stock.');
+      setToast('So luong da dat muc ton kho hien co.');
       return;
     }
     commit(current => ({
@@ -174,7 +174,7 @@ export default function SellzyApp() {
       cart: changeQuantity(current.cart, id, existing + quantity),
     }));
     setToast(
-      `${Math.min(quantity, product.stock - existing)} added to your cart`,
+      `Da them ${Math.min(quantity, product.stock - existing)} san pham vao gio hang.`,
     );
   };
   const openCart = () => push({ name: 'cart' });
@@ -189,7 +189,9 @@ export default function SellzyApp() {
         ? current.wishlistIds.filter(item => item !== id)
         : [...current.wishlistIds, id],
     }));
-    setToast(liked ? 'Removed from wishlist' : 'Saved to wishlist');
+    setToast(
+      liked ? 'Da bo khoi danh sach yeu thich.' : 'Da them vao danh sach yeu thich.',
+    );
   };
   const applyCoupon = (code: string) => {
     const normalized = normalizeCoupon(code);
@@ -207,7 +209,7 @@ export default function SellzyApp() {
       `SZ-${Date.now().toString(36).toUpperCase()}-${++sequence.current}`,
     );
     if (!order) {
-      setToast('Check your delivery details and cart.');
+      setToast('Vui long kiem tra thong tin giao hang va gio hang.');
       return;
     }
     placing.current = true;
@@ -229,7 +231,7 @@ export default function SellzyApp() {
       cart: reorderCart(current.cart, order),
     }));
     openCart();
-    setToast('Order items added to your cart');
+    setToast('Da them san pham trong don vao gio hang.');
   };
   const finishAuthentication = async (email: string, fullName?: string) => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -265,7 +267,7 @@ export default function SellzyApp() {
         },
       ];
     });
-    setToast('Signed in successfully');
+    setToast('Dang nhap thanh cong.');
   };
   const signIn = async (email: string, password: string) => {
     await login({ email, password });
@@ -286,7 +288,7 @@ export default function SellzyApp() {
       ...current,
       auth: { ...defaultAuthSession },
     }));
-    setToast('You are now signed out');
+    setToast('Ban da dang xuat.');
   };
 
   if (!ready) {
@@ -296,27 +298,27 @@ export default function SellzyApp() {
         {loadError ? (
           <>
             <Text style={styles.loadingText}>
-              Your saved shopping data could not be opened.
+              Khong the mo du lieu mua sam da luu.
             </Text>
             <Pressable
               accessibilityRole="button"
               onPress={() => setLoadAttempt(value => value + 1)}
               style={styles.retry}
             >
-              <Text style={styles.white}>Try again</Text>
+              <Text style={styles.white}>Thu lai</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={startFresh}
               style={styles.fresh}
             >
-              <Text style={styles.freshText}>Start with empty local data</Text>
+              <Text style={styles.freshText}>Bat dau voi du lieu moi tren thiet bi</Text>
             </Pressable>
           </>
         ) : (
           <ActivityIndicator
             color={COLORS.teal}
-            accessibilityLabel="Loading saved shopping data"
+            accessibilityLabel="Dang tai du lieu mua sam da luu"
           />
         )}
       </View>
@@ -452,7 +454,7 @@ export default function SellzyApp() {
             profile={profile}
             onSaveProfile={next => {
               commit(current => ({ ...current, profile: next }));
-              setToast('Profile saved on this device');
+              setToast('Da luu ho so tren thiet bi.');
             }}
             onHelp={() => push({ name: 'help' })}
             onOrders={() => goRoot('orders')}
@@ -492,7 +494,7 @@ export default function SellzyApp() {
             vendorDraft={data.vendorDraft}
             onSaveVendorDraft={next => {
               commit(current => ({ ...current, vendorDraft: next }));
-              setToast('Vendor draft saved on this device');
+              setToast('Da luu ban nhap cua hang tren thiet bi.');
             }}
           />
         );
@@ -527,7 +529,7 @@ export default function SellzyApp() {
           style={styles.saveWarning}
         >
           <Text style={styles.warningText}>
-            Changes are only in memory. Tap to retry saving.
+            Cac thay doi hien chi luu trong bo nho. Cham de thu luu lai.
           </Text>
         </Pressable>
       ) : null}
@@ -569,7 +571,12 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   brand: { fontSize: 40, color: COLORS.teal, fontWeight: '900' },
-  loadingText: { color: COLORS.muted, textAlign: 'center' },
+  loadingText: {
+    color: COLORS.muted,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
   retry: {
     paddingHorizontal: 24,
     paddingVertical: 14,
@@ -582,8 +589,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  freshText: { color: COLORS.teal, fontWeight: '700' },
-  white: { color: COLORS.white, fontWeight: '700' },
+  freshText: { color: COLORS.teal, fontSize: 14, fontWeight: '700' },
+  white: { color: COLORS.white, fontSize: 14, fontWeight: '700' },
   toast: {
     position: 'absolute',
     left: 24,
@@ -596,9 +603,10 @@ const styles = StyleSheet.create({
   toastText: {
     color: COLORS.white,
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
   },
   saveWarning: { backgroundColor: '#FFF3D2', padding: 12 },
-  warningText: { color: '#755900', fontSize: 12, textAlign: 'center' },
+  warningText: { color: '#755900', fontSize: 13, textAlign: 'center' },
 });

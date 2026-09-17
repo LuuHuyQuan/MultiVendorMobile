@@ -59,7 +59,7 @@ export function calculateTotals(cart: CartQuantities, coupon = '') {
   const discountCents = normalizeCoupon(coupon)
     ? Math.round(subtotalCents * 0.1)
     : 0;
-  // Free shipping is based on the merchandise subtotal before promotions.
+  // Miễn phí giao hàng được tính trên giá trị sản phẩm trước khuyến mãi.
   const shippingCents = subtotalCents === 0 || subtotalCents >= 3500 ? 0 : 499;
   return {
     subtotal: subtotalCents / 100,
@@ -75,18 +75,18 @@ export function validateDelivery(
 ): Partial<Record<keyof CustomerDetails, string>> {
   const errors: Partial<Record<keyof CustomerDetails, string>> = {};
   if (details.fullName.trim().length < 2)
-    errors.fullName = 'Enter your full name.';
+    errors.fullName = 'Vui lòng nhập họ và tên.';
   if (
     !/^[+\d\s().-]+$/.test(details.phone) ||
     !/^\d{8,15}$/.test(details.phone.replace(/\D/g, ''))
   ) {
-    errors.phone = 'Enter a phone number with 8–15 digits.';
+    errors.phone = 'Số điện thoại phải có từ 8–15 chữ số.';
   }
   if (details.address.trim().length < 5)
-    errors.address = 'Enter your street address.';
-  if (details.city.trim().length < 2) errors.city = 'Enter your city.';
+    errors.address = 'Vui lòng nhập địa chỉ nhận hàng.';
+  if (details.city.trim().length < 2) errors.city = 'Vui lòng nhập tỉnh/thành phố.';
   if (details.payment !== 'cash' && details.payment !== 'card')
-    errors.payment = 'Choose a payment method.';
+    errors.payment = 'Vui lòng chọn phương thức thanh toán.';
   return errors;
 }
 
@@ -96,16 +96,16 @@ export function validateDemoCard(
   const errors: Partial<Record<keyof DemoCardDetails, string>> = {};
   const digits = card.number.replace(/\D/g, '');
   if (card.cardholder.trim().length < 2) {
-    errors.cardholder = 'Enter the cardholder name.';
+    errors.cardholder = 'Vui lòng nhập tên chủ thẻ.';
   }
   if (!/^\d{16}$/.test(digits) || !passesLuhn(digits)) {
-    errors.number = 'Enter a valid 16-digit demo card number.';
+    errors.number = 'Vui lòng nhập số thẻ mẫu gồm 16 chữ số hợp lệ.';
   }
   if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(card.expiry.trim())) {
-    errors.expiry = 'Use MM/YY.';
+    errors.expiry = 'Dùng định dạng MM/YY.';
   }
   if (!/^\d{3,4}$/.test(card.cvv.trim())) {
-    errors.cvv = 'Use 3 or 4 digits.';
+    errors.cvv = 'CVV gồm 3 hoặc 4 chữ số.';
   }
   return errors;
 }
@@ -138,7 +138,7 @@ export function createOrder(
   const lines = orderLines(cart);
   return {
     id,
-    date: now.toLocaleDateString('en-US', {
+    date: now.toLocaleDateString('vi-VN', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',

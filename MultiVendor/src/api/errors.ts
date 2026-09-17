@@ -82,7 +82,7 @@ export const createApiError = (
       ? errorPayload.message
       : typeof payload === 'string' && payload.trim()
       ? payload
-      : response.statusText || `Yeu cau that bai (${response.status}).`;
+      : response.statusText || `Yêu cầu thất bại (${response.status}).`;
 
   return new ApiError(
     response.status,

@@ -38,10 +38,10 @@ const categoryIcons: Record<string, IconName> = {
   Nutrition: 'leaf',
 };
 const benefits: { icon: IconName; title: string; text: string }[] = [
-  { icon: 'truck', title: 'Free Shipping', text: 'On orders over $35' },
-  { icon: 'heart', title: 'Saved Favorites', text: 'Keep your picks close' },
-  { icon: 'package', title: 'Your Orders', text: 'Everything in one place' },
-  { icon: 'credit-card', title: 'Easy Checkout', text: 'Cash on delivery' },
+  { icon: 'truck', title: 'Miễn phí vận chuyển', text: 'Đơn hàng từ $35' },
+  { icon: 'heart', title: 'Sản phẩm yêu thích', text: 'Lưu lại sản phẩm bạn thích' },
+  { icon: 'package', title: 'Đơn hàng của bạn', text: 'Quản lý dễ dàng tại một nơi' },
+  { icon: 'credit-card', title: 'Thanh toán đơn giản', text: 'Hỗ trợ thanh toán khi nhận hàng' },
 ];
 
 export default function HomeScreen({
@@ -70,15 +70,15 @@ export default function HomeScreen({
         ]}
       >
         <Icon name="leaf" size={14} color={COLORS.white} />
-        <Text style={styles.promoText}>Wellness essentials</Text>
+        <Text style={styles.promoText}>Thiết yếu cho cuộc sống khỏe</Text>
         <View style={styles.promoBadge}>
-          <Text style={styles.promoBadgeText}>UP TO 31% OFF</Text>
+          <Text style={styles.promoBadgeText}>GIẢM TỚI 31%</Text>
         </View>
       </View>
 
       <View style={styles.header}>
         <Pressable
-          accessibilityLabel="Browse sellers"
+          accessibilityLabel="Xem các cửa hàng"
           accessibilityRole="button"
           testID="home-sellers"
           onPress={onSellers}
@@ -93,7 +93,7 @@ export default function HomeScreen({
           style={styles.logo}
         />
         <Pressable
-          accessibilityLabel={`${cartCount} items in cart`}
+          accessibilityLabel={`${cartCount} sản phẩm trong giỏ`}
           accessibilityRole="button"
           testID="header-cart"
           onPress={onCart}
@@ -113,22 +113,22 @@ export default function HomeScreen({
       <SearchBar
         onChangeText={setQuery}
         onSubmit={() => onShop(undefined, query.trim())}
-        placeholder="Search for the items"
+        placeholder="Tìm sản phẩm bạn cần"
         value={query}
       />
 
       <View style={styles.hero}>
         <View style={styles.heroOfferRow}>
-          <Text style={styles.heroEyebrow}>EXCLUSIVE OFFER</Text>
+          <Text style={styles.heroEyebrow}>ƯU ĐÃI ĐỘC QUYỀN</Text>
           <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>UP TO 31% OFF</Text>
+            <Text style={styles.heroBadgeText}>GIẢM TỚI 31%</Text>
           </View>
         </View>
         <Text style={styles.heroTitle}>
-          Everything you need for wellness in one place.
+          Chăm sóc sức khỏe mỗi ngày, gọn trong một nơi.
         </Text>
         <Text style={styles.heroText}>
-          Discover trusted brands, everyday essentials and exclusive deals.
+          Khám phá thương hiệu đáng tin cậy, sản phẩm thiết yếu và ưu đãi riêng cho bạn.
         </Text>
         <View style={styles.heroBottom}>
           <Pressable
@@ -140,7 +140,7 @@ export default function HomeScreen({
               pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.heroButtonText}>Shop Now</Text>
+            <Text style={styles.heroButtonText}>Mua ngay</Text>
             <View style={styles.heroArrowWrap}>
               <Icon name="arrow-up-right" size={18} color={COLORS.teal} />
             </View>
@@ -173,10 +173,10 @@ export default function HomeScreen({
       </ScrollView>
 
       <SectionHeading
-        action="View All"
+        action="Xem tất cả"
         onAction={() => onShop()}
-        subtitle="Find your daily essentials"
-        title="Shop by Category"
+        subtitle="Tìm sản phẩm phù hợp cho mỗi ngày"
+        title="Mua theo danh mục"
       />
       <ScrollView
         contentContainerStyle={styles.categoryList}
@@ -186,7 +186,7 @@ export default function HomeScreen({
         {categories.slice(1).map(category => (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Shop ${category.label}`}
+            accessibilityLabel={`Xem danh mục ${category.label}`}
             testID={`home-category-${category.id}`}
             key={category.id}
             onPress={() => onShop(category.id)}
@@ -212,10 +212,10 @@ export default function HomeScreen({
       </ScrollView>
 
       <SectionHeading
-        action="View All"
+        action="Xem tất cả"
         onAction={() => onShop(undefined, undefined, 'discount')}
-        subtitle="Limited-time offers on wellness favorites"
-        title="Daily Discount You'll Love"
+        subtitle="Ưu đãi có hạn cho những sản phẩm được yêu thích"
+        title="Giảm giá mỗi ngày"
       />
       <ScrollView
         contentContainerStyle={styles.productList}
@@ -238,17 +238,17 @@ export default function HomeScreen({
       </ScrollView>
 
       <View style={styles.dealBanner}>
-        <Text style={styles.dealEyebrow}>LIMITED TIME OFFER</Text>
-        <Text style={styles.dealTitle}>Hot Deals This Week</Text>
+        <Text style={styles.dealEyebrow}>ƯU ĐÃI CÓ HẠN</Text>
+        <Text style={styles.dealTitle}>Giá tốt trong tuần</Text>
         <Text style={styles.dealText}>
-          Save more on vitamins, skincare and health essentials.
+          Tiết kiệm hơn cho vitamin, chăm sóc da và sản phẩm thiết yếu.
         </Text>
         <Pressable
           accessibilityRole="button"
           onPress={() => onShop(undefined, undefined, 'discount')}
           style={styles.dealButton}
         >
-          <Text style={styles.dealButtonText}>Explore Deals</Text>
+          <Text style={styles.dealButtonText}>Khám phá ưu đãi</Text>
           <Icon name="arrow-right" color="#4E3E00" size={15} />
         </Pressable>
         <Image
@@ -259,16 +259,16 @@ export default function HomeScreen({
       </View>
 
       <SectionHeading
-        action="Meet Sellers"
+        action="Xem cửa hàng"
         onAction={onSellers}
-        subtitle="Curated stores, quality checked"
-        title="Trusted Marketplace"
+        subtitle="Cửa hàng được chọn lọc, chất lượng được kiểm tra"
+        title="Gian hàng tin cậy"
       />
       <View style={styles.sellerPreview}>
         {sellers.slice(0, 3).map((seller, index) => (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Meet ${seller.name}`}
+            accessibilityLabel={`Xem ${seller.name}`}
             onPress={onSellers}
             key={seller.name}
             style={styles.sellerMini}
@@ -345,14 +345,14 @@ const styles = StyleSheet.create({
     gap: 7,
     backgroundColor: COLORS.teal,
   },
-  promoText: { color: COLORS.white, fontSize: 11, fontWeight: '700' },
+  promoText: { color: COLORS.white, fontSize: 12, fontWeight: '700' },
   promoBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
     backgroundColor: COLORS.yellow,
   },
-  promoBadgeText: { color: '#604900', fontSize: 9, fontWeight: '900' },
+  promoBadgeText: { color: '#604900', fontSize: 10, fontWeight: '900' },
   header: {
     height: 72,
     paddingHorizontal: 16,
@@ -421,12 +421,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  heroBadgeText: { color: '#594500', fontSize: 9, fontWeight: '900' },
+  heroBadgeText: { color: '#594500', fontSize: 10, fontWeight: '900' },
   heroTitle: {
     marginTop: 19,
     color: COLORS.white,
-    fontSize: 30,
-    lineHeight: 37,
+    fontSize: 31,
+    lineHeight: 39,
     letterSpacing: -0.6,
     fontWeight: '900',
     zIndex: 2,
@@ -434,8 +434,8 @@ const styles = StyleSheet.create({
   heroText: {
     marginTop: 14,
     color: '#D7EBE9',
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 21,
     zIndex: 2,
   },
   heroButton: {
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     gap: 11,
     zIndex: 2,
   },
-  heroButtonText: { color: COLORS.white, fontSize: 13, fontWeight: '900' },
+  heroButtonText: { color: COLORS.white, fontSize: 14, fontWeight: '900' },
   heroArrowWrap: {
     width: 34,
     height: 34,
@@ -505,11 +505,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 11,
   },
-  benefitTitle: { color: COLORS.ink, fontSize: 13, fontWeight: '900' },
+  benefitTitle: { color: COLORS.ink, fontSize: 14, fontWeight: '900' },
   benefitText: {
     color: COLORS.muted,
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
     marginTop: 4,
   },
   sectionHeading: {
@@ -529,14 +529,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: COLORS.ink,
-    fontSize: 21,
-    lineHeight: 27,
+    fontSize: 22,
+    lineHeight: 29,
     fontWeight: '900',
   },
-  sectionSubtitle: { color: COLORS.muted, fontSize: 11, marginTop: 3 },
+  sectionSubtitle: { color: COLORS.muted, fontSize: 13, marginTop: 3 },
   viewAll: {
     color: COLORS.teal,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '900',
     paddingVertical: 4,
   },
@@ -553,8 +553,8 @@ const styles = StyleSheet.create({
     minHeight: 32,
     marginTop: 8,
     color: COLORS.ink,
-    fontSize: 11,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 17,
     textAlign: 'center',
     fontWeight: '700',
   },
@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
   },
   dealEyebrow: {
     color: COLORS.yellow,
-    fontSize: 9,
+    fontSize: 10,
     letterSpacing: 1.2,
     fontWeight: '900',
   },
@@ -585,8 +585,8 @@ const styles = StyleSheet.create({
   dealText: {
     width: '64%',
     color: '#CFE3E1',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     marginTop: 8,
   },
   dealButton: {
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: COLORS.yellow,
   },
-  dealButtonText: { color: '#4E3E00', fontSize: 11, fontWeight: '900' },
+  dealButtonText: { color: '#4E3E00', fontSize: 13, fontWeight: '900' },
   dealImage: {
     position: 'absolute',
     width: 110,
@@ -636,13 +636,13 @@ const styles = StyleSheet.create({
   sellerAvatarText: { color: COLORS.tealDark, fontSize: 18, fontWeight: '900' },
   sellerName: {
     color: COLORS.ink,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     marginTop: 8,
   },
   sellerRating: {
     color: COLORS.orange,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '800',
   },
   sellerRatingRow: {

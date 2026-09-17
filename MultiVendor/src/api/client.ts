@@ -82,7 +82,7 @@ const performTokenRefresh = async (): Promise<AuthTokenResponse> => {
 
   if (!originalSession?.refreshToken) {
     await clearSession();
-    throw new ApiError(401, 'Phien dang nhap da het han.');
+    throw new ApiError(401, 'Phiên đăng nhập đã hết hạn.');
   }
 
   try {
@@ -98,7 +98,7 @@ const performTokenRefresh = async (): Promise<AuthTokenResponse> => {
     }
 
     if (!isAuthTokenResponse(payload)) {
-      throw new ApiError(500, 'Du lieu token tra ve khong hop le.', payload);
+      throw new ApiError(500, 'Dữ liệu token trả về không hợp lệ.', payload);
     }
 
     const currentSession = await getStoredSession();
@@ -109,7 +109,7 @@ const performTokenRefresh = async (): Promise<AuthTokenResponse> => {
         return sessionToTokenResponse(currentSession);
       }
 
-      throw new ApiError(401, 'Phien dang nhap da thay doi.');
+      throw new ApiError(401, 'Phiên đăng nhập đã thay đổi.');
     }
 
     await storeAuthTokens(payload);

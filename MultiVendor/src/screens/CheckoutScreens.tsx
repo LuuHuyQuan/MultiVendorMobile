@@ -69,16 +69,16 @@ export function CartScreen({
       <ScreenHeader
         canGoBack
         onBack={onBack}
-        subtitle={`${lines.length} unique items`}
-        title="Shopping Cart"
+        subtitle={`${lines.length} sản phẩm khác nhau`}
+        title="Giỏ hàng"
       />
       {!lines.length ? (
         <EmptyState
-          actionLabel="Start Shopping"
+          actionLabel="Mua sắm ngay"
           icon="▱"
-          message="Your cart is waiting for something great. Explore today's wellness deals."
+          message="Giỏ hàng đang chờ sản phẩm phù hợp. Khám phá ưu đãi sức khỏe hôm nay nhé."
           onAction={onShop}
-          title="Your cart is empty"
+          title="Giỏ hàng đang trống"
         />
       ) : (
         <>
@@ -98,28 +98,28 @@ export function CartScreen({
               />
             ))}
 
-            <Text style={styles.cardHeading}>Have a coupon?</Text>
+            <Text style={styles.cardHeading}>Bạn có mã ưu đãi?</Text>
             <View style={styles.couponRow}>
               <TextInput
                 testID="coupon-input"
-                accessibilityLabel="Coupon code"
+                accessibilityLabel="Mã ưu đãi"
                 autoCapitalize="characters"
                 onChangeText={value => {
                   setCoupon(value);
                   setCouponError(false);
                 }}
-                placeholder="Try SELLZY10"
+                placeholder="Nhập SELLZY10"
                 placeholderTextColor="#98A1A6"
                 style={styles.couponInput}
                 value={coupon}
               />
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Apply coupon"
+                accessibilityLabel="Áp dụng mã ưu đãi"
                 onPress={() => setCouponError(!onApplyCoupon(coupon))}
                 style={styles.couponButton}
               >
-                <Text style={styles.couponButtonText}>Apply</Text>
+                <Text style={styles.couponButtonText}>Áp dụng</Text>
               </Pressable>
             </View>
             {couponError || couponApplied ? (
@@ -130,8 +130,8 @@ export function CartScreen({
                 ]}
               >
                 {couponError
-                  ? 'This coupon is not valid. Try SELLZY10.'
-                  : `${couponCode} applied — you saved ${money(discount)}!`}
+                  ? 'Mã ưu đãi không hợp lệ. Hãy thử SELLZY10.'
+                  : `Đã áp dụng ${couponCode} — bạn tiết kiệm ${money(discount)}!`}
               </Text>
             ) : null}
             {couponApplied ? (
@@ -143,30 +143,30 @@ export function CartScreen({
                   setCouponError(false);
                 }}
               >
-                <Text style={styles.removeCoupon}>Remove coupon</Text>
+                <Text style={styles.removeCoupon}>Xóa mã ưu đãi</Text>
               </Pressable>
             ) : null}
 
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>Order Summary</Text>
-              <SummaryRow label="Subtotal" value={money(subtotal)} />
+              <Text style={styles.summaryTitle}>Tóm tắt đơn hàng</Text>
+              <SummaryRow label="Tạm tính" value={money(subtotal)} />
               <SummaryRow
-                label="Discount"
+                label="Giảm giá"
                 positive
                 value={discount ? `−${money(discount)}` : '$0.00'}
               />
               <SummaryRow
-                label="Shipping"
+                label="Vận chuyển"
                 positive={shipping === 0}
-                value={shipping === 0 ? 'FREE' : money(shipping)}
+                value={shipping === 0 ? 'MIỄN PHÍ' : money(shipping)}
               />
               <View style={styles.summaryDivider} />
-              <SummaryRow bold label="Total" value={money(total)} />
+              <SummaryRow bold label="Tổng cộng" value={money(total)} />
             </View>
           </ScrollView>
           <View style={styles.stickyFooter}>
             <View>
-              <Text style={styles.footerLabel}>Total</Text>
+              <Text style={styles.footerLabel}>Tổng cộng</Text>
               <Text style={styles.footerTotal}>{money(total)}</Text>
             </View>
             <Pressable
@@ -175,7 +175,7 @@ export function CartScreen({
               onPress={onCheckout}
               style={styles.checkoutButton}
             >
-              <Text style={styles.checkoutButtonText}>Checkout →</Text>
+              <Text style={styles.checkoutButtonText}>Thanh toán →</Text>
             </Pressable>
           </View>
         </>
@@ -201,7 +201,7 @@ function CartLine({
     <View style={styles.cartLine}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`View ${product.name}`}
+        accessibilityLabel={`Xem ${product.name}`}
         onPress={onOpen}
         style={styles.cartImageWrap}
       >
@@ -221,7 +221,7 @@ function CartLine({
           <View style={styles.miniQuantity}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Decrease quantity of ${product.name}`}
+              accessibilityLabel={`Giảm số lượng ${product.name}`}
               disabled={quantity <= 1}
               onPress={() => onSetQuantity(Math.max(1, quantity - 1))}
               style={styles.miniQuantityButton}
@@ -235,7 +235,7 @@ function CartLine({
             <Text style={styles.miniQuantityValue}>{quantity}</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`Increase quantity of ${product.name}`}
+              accessibilityLabel={`Tăng số lượng ${product.name}`}
               disabled={quantity >= product.stock}
               onPress={() =>
                 onSetQuantity(Math.min(product.stock, quantity + 1))
@@ -251,11 +251,11 @@ function CartLine({
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`Remove ${product.name} from cart`}
+            accessibilityLabel={`Xóa ${product.name} khỏi giỏ hàng`}
             onPress={onRemove}
             style={styles.removeButton}
           >
-            <Text style={styles.removeText}>Remove</Text>
+            <Text style={styles.removeText}>Xóa</Text>
           </Pressable>
         </View>
       </View>
@@ -356,7 +356,7 @@ export function CheckoutScreen({
     if (step > 0) changeStep(step - 1);
     else onBack();
   };
-  const stepLabels = ['Delivery', 'Payment', 'Review'];
+  const stepLabels = ['Giao hàng', 'Thanh toán', 'Xác nhận'];
 
   return (
     <KeyboardAvoidingView
@@ -366,8 +366,8 @@ export function CheckoutScreen({
       <ScreenHeader
         canGoBack
         onBack={handleBack}
-        subtitle={`Step ${step + 1} of 3 · ${stepLabels[step]}`}
-        title="Checkout"
+        subtitle={`Bước ${step + 1}/3 · ${stepLabels[step]}`}
+        title="Thanh toán"
       />
       <ScrollView
         ref={scrollRef}
@@ -412,43 +412,43 @@ export function CheckoutScreen({
         {step === 0 ? (
           <>
             <View style={styles.formCard}>
-              <Text style={styles.formTitle}>Delivery details</Text>
+              <Text style={styles.formTitle}>Thông tin giao hàng</Text>
               <CheckoutField
                 error={deliveryAttempted ? deliveryErrors.fullName : undefined}
                 testID="checkout-name"
-                label="Full name"
+                label="Họ và tên"
                 onChangeText={value => update('fullName', value)}
-                placeholder="Your full name"
+                placeholder="Nhập họ và tên"
                 value={details.fullName}
               />
               <CheckoutField
                 error={deliveryAttempted ? deliveryErrors.phone : undefined}
                 testID="checkout-phone"
                 keyboardType="phone-pad"
-                label="Phone number"
+                label="Số điện thoại"
                 onChangeText={value => update('phone', value)}
-                placeholder="Phone number"
+                placeholder="Nhập số điện thoại"
                 value={details.phone}
               />
               <CheckoutField
                 error={deliveryAttempted ? deliveryErrors.address : undefined}
                 testID="checkout-address"
-                label="Street address"
+                label="Địa chỉ nhận hàng"
                 onChangeText={value => update('address', value)}
-                placeholder="House number and street"
+                placeholder="Số nhà, tên đường"
                 value={details.address}
               />
               <CheckoutField
                 error={deliveryAttempted ? deliveryErrors.city : undefined}
                 testID="checkout-city"
-                label="City"
+                label="Tỉnh / Thành phố"
                 onChangeText={value => update('city', value)}
-                placeholder="City"
+                placeholder="Nhập tỉnh hoặc thành phố"
                 value={details.city}
               />
               {deliveryAttempted && !deliveryValid ? (
                 <Text style={styles.formError}>
-                  Please complete all delivery fields correctly.
+                  Vui lòng điền đầy đủ và chính xác thông tin giao hàng.
                 </Text>
               ) : null}
             </View>
@@ -475,7 +475,7 @@ export function CheckoutScreen({
               ]}
             >
               <Text style={sharedStyles.primaryButtonText}>
-                Continue to payment
+                Tiếp tục thanh toán
               </Text>
             </Pressable>
           </>
@@ -484,28 +484,28 @@ export function CheckoutScreen({
         {step === 1 ? (
           <>
             <View style={styles.formCard}>
-              <Text style={styles.formTitle}>Payment method</Text>
+              <Text style={styles.formTitle}>Phương thức thanh toán</Text>
               <PaymentOption
                 active={details.payment === 'cash'}
                 icon="truck"
-                label="Cash on delivery"
+                label="Thanh toán khi nhận hàng"
                 onPress={() => update('payment', 'cash')}
-                subtitle="Record the order now; payment happens at delivery"
+                subtitle="Đơn được lưu ngay, thanh toán khi nhận hàng"
               />
               <PaymentOption
                 active={details.payment === 'card'}
                 icon="credit-card"
-                label="Credit or debit card"
+                label="Thẻ tín dụng hoặc ghi nợ"
                 onPress={() => update('payment', 'card')}
-                subtitle="Demo card form — no charge is made"
+                subtitle="Biểu mẫu thẻ mẫu — không phát sinh thanh toán"
               />
               {details.payment === 'card' ? (
                 <>
                   <View style={styles.demoNotice}>
                     <Icon name="shield" color="#77601A" size={18} />
                     <Text style={styles.demoNoticeText}>
-                      Demo only. Use sample number 4242 4242 4242 4242. Card
-                      fields are never saved or sent.
+                      Đây là bản mẫu. Dùng số 4242 4242 4242 4242. Thông tin
+                      thẻ không bao giờ được lưu hoặc gửi đi.
                     </Text>
                   </View>
                   <CheckoutField
@@ -513,9 +513,9 @@ export function CheckoutScreen({
                     autoComplete="off"
                     error={paymentAttempted ? cardErrors.cardholder : undefined}
                     testID="card-holder"
-                    label="Name on card"
+                    label="Tên in trên thẻ"
                     onChangeText={value => updateCard('cardholder', value)}
-                    placeholder="Demo cardholder"
+                    placeholder="Tên chủ thẻ mẫu"
                     value={card.cardholder}
                   />
                   <CheckoutField
@@ -523,7 +523,7 @@ export function CheckoutScreen({
                     error={paymentAttempted ? cardErrors.number : undefined}
                     testID="card-number"
                     keyboardType="number-pad"
-                    label="Card number"
+                    label="Số thẻ"
                     maxLength={19}
                     onChangeText={value => {
                       const digits = value.replace(/\D/g, '').slice(0, 16);
@@ -542,7 +542,7 @@ export function CheckoutScreen({
                         error={paymentAttempted ? cardErrors.expiry : undefined}
                         testID="card-expiry"
                         keyboardType="number-pad"
-                        label="Expiry"
+                    label="Ngày hết hạn"
                         maxLength={5}
                         onChangeText={value => {
                           const digits = value.replace(/\D/g, '').slice(0, 4);
@@ -582,14 +582,14 @@ export function CheckoutScreen({
                 <View style={styles.demoNotice}>
                   <Icon name="info" color="#77601A" size={18} />
                   <Text style={styles.demoNoticeText}>
-                    Cash on delivery is stored as a demo preference. No seller
-                    or courier receives this order.
+                    Lựa chọn thanh toán khi nhận hàng chỉ được lưu cho bản mẫu.
+                    Không có người bán hoặc đơn vị vận chuyển nào nhận đơn này.
                   </Text>
                 </View>
               )}
               {paymentAttempted && !paymentValid ? (
                 <Text style={styles.formError}>
-                  Check the highlighted demo card fields.
+                  Vui lòng kiểm tra các trường thẻ mẫu đang được đánh dấu.
                 </Text>
               ) : null}
             </View>
@@ -603,7 +603,7 @@ export function CheckoutScreen({
                   styles.checkoutActionButton,
                 ]}
               >
-                <Text style={sharedStyles.secondaryButtonText}>Back</Text>
+                <Text style={sharedStyles.secondaryButtonText}>Quay lại</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -617,7 +617,7 @@ export function CheckoutScreen({
                   styles.checkoutActionButton,
                 ]}
               >
-                <Text style={sharedStyles.primaryButtonText}>Review order</Text>
+                <Text style={sharedStyles.primaryButtonText}>Xem lại đơn hàng</Text>
               </Pressable>
             </View>
           </>
@@ -627,14 +627,14 @@ export function CheckoutScreen({
           <>
             <View style={styles.reviewCard}>
               <View style={styles.reviewHeader}>
-                <Text style={styles.reviewTitle}>Delivery</Text>
+                <Text style={styles.reviewTitle}>Giao hàng</Text>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Edit delivery details"
+                  accessibilityLabel="Sửa thông tin giao hàng"
                   onPress={() => changeStep(0)}
                   style={styles.editLink}
                 >
-                  <Text style={styles.editLinkText}>Edit</Text>
+                  <Text style={styles.editLinkText}>Sửa</Text>
                 </Pressable>
               </View>
               <Text style={styles.reviewStrong}>{details.fullName}</Text>
@@ -645,25 +645,25 @@ export function CheckoutScreen({
             </View>
             <View style={styles.reviewCard}>
               <View style={styles.reviewHeader}>
-                <Text style={styles.reviewTitle}>Payment</Text>
+                <Text style={styles.reviewTitle}>Thanh toán</Text>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Edit payment method"
+                  accessibilityLabel="Sửa phương thức thanh toán"
                   onPress={() => changeStep(1)}
                   style={styles.editLink}
                 >
-                  <Text style={styles.editLinkText}>Edit</Text>
+                  <Text style={styles.editLinkText}>Sửa</Text>
                 </Pressable>
               </View>
               <Text style={styles.reviewStrong}>
                 {details.payment === 'cash'
-                  ? 'Cash on delivery'
-                  : `Demo card ending ${card.number
+                  ? 'Thanh toán khi nhận hàng'
+                  : `Thẻ mẫu kết thúc bằng ${card.number
                       .replace(/\D/g, '')
                       .slice(-4)}`}
               </Text>
               <Text style={styles.reviewText}>
-                No charge is processed in this local demo.
+                Bản mẫu trên thiết bị không thực hiện bất kỳ khoản thanh toán nào.
               </Text>
             </View>
             <CheckoutSummary
@@ -684,7 +684,7 @@ export function CheckoutScreen({
                   styles.checkoutActionButton,
                 ]}
               >
-                <Text style={sharedStyles.secondaryButtonText}>Back</Text>
+                <Text style={sharedStyles.secondaryButtonText}>Quay lại</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -709,13 +709,13 @@ export function CheckoutScreen({
                 ]}
               >
                 <Text style={sharedStyles.primaryButtonText}>
-                  {submitting ? 'Saving your order…' : 'Place Demo Order'}
+                  {submitting ? 'Đang lưu đơn hàng…' : 'Đặt đơn mẫu'}
                 </Text>
               </Pressable>
             </View>
             <Text style={styles.secureText}>
-              By placing this demo order, you save a local order summary only.
-              No payment or shipment is initiated.
+              Khi đặt đơn mẫu, bạn chỉ lưu tóm tắt đơn hàng trên thiết bị.
+              Không có thanh toán hoặc vận chuyển nào được khởi tạo.
             </Text>
           </>
         ) : null}
@@ -743,7 +743,7 @@ function CheckoutSummary({
 }) {
   return (
     <View style={styles.summaryCard}>
-      <Text style={styles.summaryTitle}>Your order</Text>
+      <Text style={styles.summaryTitle}>Đơn hàng của bạn</Text>
       {lines.map(product => (
         <View key={product.id} style={styles.checkoutLine}>
           <Text numberOfLines={1} style={styles.checkoutLineName}>
@@ -755,20 +755,20 @@ function CheckoutSummary({
         </View>
       ))}
       <View style={styles.summaryDivider} />
-      <SummaryRow label="Subtotal" value={money(subtotal)} />
+      <SummaryRow label="Tạm tính" value={money(subtotal)} />
       {couponCode ? (
         <SummaryRow
-          label={`Discount (${couponCode})`}
+          label={`Giảm giá (${couponCode})`}
           positive
           value={`−${money(discount)}`}
         />
       ) : null}
       <SummaryRow
-        label="Shipping"
+        label="Vận chuyển"
         positive={shipping === 0}
-        value={shipping === 0 ? 'FREE' : money(shipping)}
+        value={shipping === 0 ? 'MIỄN PHÍ' : money(shipping)}
       />
-      <SummaryRow bold label="Order total" value={money(total)} />
+      <SummaryRow bold label="Tổng đơn hàng" value={money(total)} />
     </View>
   );
 }
@@ -858,15 +858,15 @@ export function OrderSuccessScreen({
       <View style={styles.successIconWrap}>
         <Icon name="check" color={COLORS.teal} size={55} />
       </View>
-      <Text style={styles.successTitle}>Order saved!</Text>
+      <Text style={styles.successTitle}>Đã lưu đơn hàng!</Text>
       <Text style={styles.successMessage}>
-        Your demo order is ready to review in My Orders.
+        Đơn hàng mẫu đã sẵn sàng để xem lại trong mục Đơn hàng của tôi.
       </Text>
       <View style={styles.orderIdCard}>
-        <Text style={styles.orderIdLabel}>ORDER NUMBER</Text>
+        <Text style={styles.orderIdLabel}>MÃ ĐƠN HÀNG</Text>
         <Text style={styles.orderId}>{orderId}</Text>
         <Text style={styles.orderEta}>
-          Saved locally · No charge or shipment
+          Đã lưu trên thiết bị · Không thanh toán hoặc vận chuyển
         </Text>
       </View>
       <Pressable
@@ -875,14 +875,14 @@ export function OrderSuccessScreen({
         onPress={onOrders}
         style={[sharedStyles.primaryButton, styles.successButton]}
       >
-        <Text style={sharedStyles.primaryButtonText}>View My Orders</Text>
+        <Text style={sharedStyles.primaryButtonText}>Xem đơn hàng của tôi</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
         onPress={onHome}
         style={[sharedStyles.secondaryButton, styles.successButton]}
       >
-        <Text style={sharedStyles.secondaryButtonText}>Continue Shopping</Text>
+        <Text style={sharedStyles.secondaryButtonText}>Tiếp tục mua sắm</Text>
       </Pressable>
     </View>
   );
@@ -921,11 +921,11 @@ const styles = StyleSheet.create({
   },
   cartImage: { width: '90%', height: '90%' },
   cartLineBody: { flex: 1, paddingLeft: 13 },
-  cartStore: { color: COLORS.teal, fontSize: 9, fontWeight: '900' },
+  cartStore: { color: COLORS.teal, fontSize: 11, fontWeight: '900' },
   cartName: {
     color: COLORS.ink,
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: 14,
+    lineHeight: 20,
     fontWeight: '800',
     marginTop: 4,
   },
@@ -961,10 +961,10 @@ const styles = StyleSheet.create({
     minWidth: 20,
     textAlign: 'center',
     color: COLORS.ink,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
   },
-  removeText: { color: COLORS.red, fontSize: 10, fontWeight: '800' },
+  removeText: { color: COLORS.red, fontSize: 12, fontWeight: '800' },
   cardHeading: {
     color: COLORS.ink,
     fontSize: 15,
@@ -992,8 +992,8 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 14,
     backgroundColor: COLORS.teal,
   },
-  couponButtonText: { color: COLORS.white, fontSize: 12, fontWeight: '900' },
-  couponMessage: { color: COLORS.muted, fontSize: 10, marginTop: 7 },
+  couponButtonText: { color: COLORS.white, fontSize: 13, fontWeight: '900' },
+  couponMessage: { color: COLORS.muted, fontSize: 12, marginTop: 7 },
   couponSuccess: { color: COLORS.success, fontWeight: '800' },
   summaryCard: {
     marginTop: 18,
@@ -1013,8 +1013,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 6,
   },
-  summaryLabel: { color: COLORS.muted, fontSize: 12 },
-  summaryValue: { color: COLORS.ink, fontSize: 12, fontWeight: '800' },
+  summaryLabel: { color: COLORS.muted, fontSize: 13 },
+  summaryValue: { color: COLORS.ink, fontSize: 13, fontWeight: '800' },
   summaryPositive: { color: COLORS.success },
   summaryBold: { color: COLORS.ink, fontSize: 15, fontWeight: '900' },
   summaryTotal: { fontSize: 19, fontWeight: '900' },
@@ -1034,7 +1034,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  footerLabel: { color: COLORS.muted, fontSize: 10 },
+  footerLabel: { color: COLORS.muted, fontSize: 12 },
   footerTotal: {
     color: COLORS.ink,
     fontSize: 21,
@@ -1073,7 +1073,7 @@ const styles = StyleSheet.create({
   stepNumberActive: { color: COLORS.white },
   stepLabel: {
     color: COLORS.muted,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '700',
     marginTop: 5,
   },
@@ -1094,7 +1094,7 @@ const styles = StyleSheet.create({
   },
   fieldWrap: { marginBottom: 14 },
   inputError: { borderColor: COLORS.red },
-  formError: { color: COLORS.red, fontSize: 10, fontWeight: '700' },
+  formError: { color: COLORS.red, fontSize: 12, fontWeight: '700' },
   paymentOption: {
     minHeight: 70,
     padding: 11,
@@ -1119,8 +1119,8 @@ const styles = StyleSheet.create({
   },
   paymentIconText: { color: COLORS.teal, fontSize: 17, fontWeight: '900' },
   paymentCopy: { flex: 1, paddingHorizontal: 11 },
-  paymentLabel: { color: COLORS.ink, fontSize: 12, fontWeight: '900' },
-  paymentSubtitle: { color: COLORS.muted, fontSize: 9, marginTop: 3 },
+  paymentLabel: { color: COLORS.ink, fontSize: 14, fontWeight: '900' },
+  paymentSubtitle: { color: COLORS.muted, fontSize: 12, marginTop: 3 },
   radio: {
     width: 20,
     height: 20,
@@ -1149,8 +1149,8 @@ const styles = StyleSheet.create({
   demoNoticeText: {
     flex: 1,
     color: '#77601A',
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 18,
   },
   cardRow: { flexDirection: 'row', gap: 12 },
   cardHalf: { flex: 1 },
@@ -1178,11 +1178,11 @@ const styles = StyleSheet.create({
   reviewTitle: { color: COLORS.ink, fontSize: 16, fontWeight: '900' },
   editLink: { minWidth: 44, minHeight: 36, alignItems: 'flex-end' },
   editLinkText: { color: COLORS.teal, fontSize: 12, fontWeight: '900' },
-  reviewStrong: { color: COLORS.ink, fontSize: 13, fontWeight: '900' },
+  reviewStrong: { color: COLORS.ink, fontSize: 14, fontWeight: '900' },
   reviewText: {
     color: COLORS.muted,
-    fontSize: 11,
-    lineHeight: 18,
+    fontSize: 12,
+    lineHeight: 19,
     marginTop: 3,
   },
   checkoutLine: {
@@ -1194,10 +1194,10 @@ const styles = StyleSheet.create({
   checkoutLineName: {
     flex: 1,
     color: COLORS.muted,
-    fontSize: 11,
+    fontSize: 12,
     paddingRight: 10,
   },
-  checkoutLinePrice: { color: COLORS.ink, fontSize: 11, fontWeight: '800' },
+  checkoutLinePrice: { color: COLORS.ink, fontSize: 12, fontWeight: '800' },
   secureText: {
     color: COLORS.muted,
     fontSize: 12,
@@ -1242,14 +1242,14 @@ const styles = StyleSheet.create({
   },
   orderIdLabel: {
     color: COLORS.muted,
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: 1,
     fontWeight: '800',
   },
   orderId: { color: COLORS.ink, fontSize: 23, fontWeight: '900', marginTop: 7 },
   orderEta: {
     color: COLORS.teal,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '700',
     marginTop: 8,
   },

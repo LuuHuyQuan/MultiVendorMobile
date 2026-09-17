@@ -33,7 +33,7 @@ export function ScreenHeader({
     <View style={styles.header}>
       {canGoBack ? (
         <Pressable
-          accessibilityLabel="Go back"
+          accessibilityLabel="Quay lại"
           accessibilityRole="button"
           testID="header-back"
           onPress={onBack}
@@ -63,7 +63,7 @@ export function ScreenHeader({
 
       {onCart ? (
         <Pressable
-          accessibilityLabel={`${cartCount} items in cart`}
+          accessibilityLabel={`${cartCount} sản phẩm trong giỏ`}
           accessibilityRole="button"
           testID="header-cart"
           onPress={onCart}
@@ -99,7 +99,7 @@ export function SearchBar({
   value,
   onChangeText,
   onSubmit,
-  placeholder = 'Search products and stores',
+  placeholder = 'Tìm sản phẩm hoặc cửa hàng',
 }: SearchBarProps) {
   return (
     <View style={styles.searchBar}>
@@ -108,7 +108,7 @@ export function SearchBar({
       </View>
       <TextInput
         testID="product-search"
-        accessibilityLabel="Search products"
+        accessibilityLabel="Tìm sản phẩm"
         onChangeText={onChangeText}
         onSubmitEditing={onSubmit}
         placeholder={placeholder}
@@ -121,7 +121,7 @@ export function SearchBar({
       />
       {value ? (
         <Pressable
-          accessibilityLabel="Clear search"
+          accessibilityLabel="Xóa nội dung tìm kiếm"
           accessibilityRole="button"
           onPress={() => onChangeText('')}
           style={styles.searchAction}
@@ -131,7 +131,7 @@ export function SearchBar({
       ) : null}
       {onSubmit ? (
         <Pressable
-          accessibilityLabel="Search products"
+          accessibilityLabel="Tìm sản phẩm"
           accessibilityRole="button"
           testID="submit-search"
           onPress={onSubmit}
@@ -175,7 +175,7 @@ export function ProductCard({
         ]}
       >
         <Pressable
-          accessibilityLabel={`View ${product.name}, ${money(product.price)}`}
+          accessibilityLabel={`Xem ${product.name}, ${money(product.price)}`}
           accessibilityRole="button"
           testID={`product-${product.id}`}
           onPress={onOpen}
@@ -188,11 +188,11 @@ export function ProductCard({
           />
         </Pressable>
         <View style={[styles.discountBadge, styles.pointerEventsNone]}>
-          <Text style={styles.discountText}>{product.discount}% OFF</Text>
+          <Text style={styles.discountText}>GIẢM {product.discount}%</Text>
         </View>
         <Pressable
           accessibilityLabel={`${
-            liked ? 'Remove from wishlist' : 'Add to wishlist'
+            liked ? 'Bỏ khỏi yêu thích' : 'Thêm vào yêu thích'
           }: ${product.name}`}
           accessibilityRole="button"
           accessibilityState={{ selected: liked }}
@@ -216,7 +216,7 @@ export function ProductCard({
         {product.store}
       </Text>
       <Pressable
-        accessibilityLabel={`View ${product.name}`}
+        accessibilityLabel={`Xem ${product.name}`}
         accessibilityRole="button"
         onPress={onOpen}
       >
@@ -239,7 +239,7 @@ export function ProductCard({
         ) : null}
       </View>
       <Pressable
-        accessibilityLabel={`Add ${product.name} to cart`}
+        accessibilityLabel={`Thêm ${product.name} vào giỏ hàng`}
         accessibilityRole="button"
         accessibilityState={{ disabled: product.stock === 0 }}
         disabled={product.stock === 0}
@@ -255,7 +255,7 @@ export function ProductCard({
       >
         <Icon name="plus" color={COLORS.white} size={15} />
         <Text style={styles.addButtonText}>
-          {product.stock > 0 ? 'Add' : 'Sold out'}
+          {product.stock > 0 ? 'Thêm' : 'Hết hàng'}
         </Text>
       </Pressable>
     </View>
@@ -271,11 +271,11 @@ type BottomNavProps = {
 };
 
 const navItems: { route: RouteName; label: string; icon: IconName }[] = [
-  { route: 'home', label: 'Home', icon: 'home' },
-  { route: 'shop', label: 'Shop', icon: 'shop' },
-  { route: 'orders', label: 'Orders', icon: 'orders' },
-  { route: 'wishlist', label: 'Wishlist', icon: 'heart' },
-  { route: 'account', label: 'Account', icon: 'user' },
+  { route: 'home', label: 'Trang chủ', icon: 'home' },
+  { route: 'shop', label: 'Cửa hàng', icon: 'shop' },
+  { route: 'orders', label: 'Đơn hàng', icon: 'orders' },
+  { route: 'wishlist', label: 'Yêu thích', icon: 'heart' },
+  { route: 'account', label: 'Tài khoản', icon: 'user' },
 ];
 
 export function BottomNav({
@@ -369,19 +369,19 @@ export const sharedStyles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingBottom: 28 },
   sectionTitle: {
     color: COLORS.ink,
-    fontSize: 21,
-    lineHeight: 27,
+    fontSize: 22,
+    lineHeight: 29,
     fontWeight: '800',
   },
   sectionSubtitle: {
     color: COLORS.muted,
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13,
+    lineHeight: 19,
     marginTop: 3,
   },
   label: {
     color: COLORS.ink,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     marginBottom: 8,
   },
@@ -393,7 +393,7 @@ export const sharedStyles = StyleSheet.create({
     paddingHorizontal: 15,
     color: COLORS.ink,
     backgroundColor: COLORS.white,
-    fontSize: 14,
+    fontSize: 15,
   },
   primaryButton: {
     height: 54,
@@ -412,7 +412,7 @@ export const sharedStyles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: COLORS.white,
   },
-  secondaryButtonText: { color: COLORS.teal, fontSize: 14, fontWeight: '800' },
+  secondaryButtonText: { color: COLORS.teal, fontSize: 15, fontWeight: '800' },
 });
 
 const styles = StyleSheet.create({
@@ -448,11 +448,11 @@ const styles = StyleSheet.create({
   headerCopy: { flex: 1, paddingHorizontal: 12 },
   headerTitle: {
     color: COLORS.ink,
-    fontSize: 19,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 26,
     fontWeight: '800',
   },
-  headerSubtitle: { color: COLORS.muted, fontSize: 11, marginTop: 2 },
+  headerSubtitle: { color: COLORS.muted, fontSize: 12, marginTop: 2 },
   headerSpacer: { width: 44 },
   cartButton: {
     width: 44,
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     color: COLORS.ink,
-    fontSize: 14,
+    fontSize: 15,
     paddingVertical: 0,
   },
   productCard: {
@@ -539,7 +539,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     backgroundColor: COLORS.red,
   },
-  discountText: { color: COLORS.white, fontSize: 8, fontWeight: '900' },
+  discountText: { color: COLORS.white, fontSize: 10, fontWeight: '900' },
   likeButton: {
     position: 'absolute',
     right: 8,
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
   },
   storeLabel: {
     color: COLORS.teal,
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '800',
     marginTop: 11,
   },
@@ -565,25 +565,25 @@ const styles = StyleSheet.create({
     minHeight: 44,
     marginTop: 4,
   },
-  productNameCompact: { fontSize: 13, lineHeight: 18, minHeight: 44 },
+  productNameCompact: { fontSize: 14, lineHeight: 19, minHeight: 46 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 7 },
   ratingText: {
     color: COLORS.ink,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     marginLeft: 3,
   },
-  reviewText: { color: COLORS.muted, fontSize: 10, marginLeft: 3 },
+  reviewText: { color: COLORS.muted, fontSize: 11, marginLeft: 3 },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 8,
     gap: 7,
   },
-  price: { color: COLORS.ink, fontSize: 16, fontWeight: '900' },
+  price: { color: COLORS.ink, fontSize: 17, fontWeight: '900' },
   oldPrice: {
     color: '#9BA3A6',
-    fontSize: 11,
+    fontSize: 12,
     textDecorationLine: 'line-through',
   },
   addButton: {
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.teal,
   },
   addButtonPressed: { backgroundColor: COLORS.tealDark },
-  addButtonText: { color: COLORS.white, fontSize: 12, fontWeight: '800' },
+  addButtonText: { color: COLORS.white, fontSize: 13, fontWeight: '800' },
   bottomNav: {
     minHeight: 68,
     paddingTop: 7,
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
   },
   navLabel: {
     color: COLORS.muted,
-    fontSize: 9,
+    fontSize: 11,
     marginTop: 2,
     fontWeight: '600',
   },
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  navBadgeText: { color: COLORS.white, fontSize: 8, fontWeight: '900' },
+  navBadgeText: { color: COLORS.white, fontSize: 9, fontWeight: '900' },
   emptyState: {
     flex: 1,
     paddingHorizontal: 35,
@@ -651,13 +651,13 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     color: COLORS.ink,
-    fontSize: 21,
+    fontSize: 22,
     fontWeight: '900',
     marginTop: 22,
   },
   emptyText: {
     color: COLORS.muted,
-    fontSize: 14,
+    fontSize: 15,
     lineHeight: 21,
     textAlign: 'center',
     marginTop: 8,
