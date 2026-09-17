@@ -10,13 +10,41 @@ import { STORAGE_KEY } from '../src/storage';
 
 const getItem = jest.mocked(AsyncStorage.getItem);
 const setItem = jest.mocked(AsyncStorage.setItem);
+const removeItem = jest.mocked(AsyncStorage.removeItem);
+const fetchMock = jest.fn();
+
+const AUTH_SESSION_KEY = '@sellzy/auth-session/v1';
+const loginTokens = {
+  tokenType: 'Bearer',
+  accessToken: 'access-token-from-api',
+  refreshToken: 'refresh-token-from-api',
+  expiresIn: 3600,
+};
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: status === 200 ? 'OK' : 'Error',
+    text: jest.fn().mockResolvedValue(JSON.stringify(body)),
+  } as unknown as Response;
+}
 
 jest.setTimeout(60_000);
 
 beforeEach(() => {
   getItem.mockReset();
   setItem.mockReset();
+  removeItem.mockReset();
+  fetchMock.mockReset();
+  getItem.mockImplementation(async key => {
+    if (key === STORAGE_KEY || key === AUTH_SESSION_KEY) return null;
+    throw new Error(`Unexpected storage key: ${key}`);
+  });
   setItem.mockResolvedValue();
+  removeItem.mockResolvedValue();
+  fetchMock.mockResolvedValue(jsonResponse(loginTokens));
+  globalThis.fetch = fetchMock;
 });
 
 async function press(
@@ -31,9 +59,82 @@ async function press(
   });
 }
 
-test('hydrates local data and renders the home screen', async () => {
-  getItem.mockResolvedValueOnce(null);
+test('signs a guest in through the API, persists tokens, and logs out', async () => {
+  let renderer!: ReactTestRenderer.ReactTestRenderer;
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<App />);
+  });
 
+  expect(getItem).toHaveBeenCalledWith(STORAGE_KEY);
+  expect(getItem).toHaveBeenCalledWith(AUTH_SESSION_KEY);
+  await press(renderer, { accessibilityLabel: 'Account' });
+  expect(renderer.root.findByProps({ children: 'Guest shopper' })).toBeTruthy();
+  await press(renderer, { testID: 'account-login' });
+  expect(renderer.root.findByProps({ children: 'Welcome back' })).toBeTruthy();
+  await ReactTestRenderer.act(async () => {
+    renderer.root
+      .findByProps({ testID: 'auth-email' })
+      .props.onChangeText('USER@example.com');
+    renderer.root
+      .findByProps({ testID: 'auth-password' })
+      .props.onChangeText('secret1');
+  });
+  await press(renderer, { testID: 'auth-submit' });
+
+  expect(
+    renderer.root.findByProps({ children: 'user@example.com' }),
+  ).toBeTruthy();
+  expect(renderer.root.findByProps({ children: 'SIGNED IN' })).toBeTruthy();
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+  const [loginUrl, loginRequest] = fetchMock.mock.calls[0];
+  expect(loginUrl).toMatch(/\/auth\/login$/);
+  expect(loginRequest).toMatchObject({ method: 'POST' });
+  expect(JSON.parse(loginRequest.body)).toEqual({
+    email: 'user@example.com',
+    password: 'secret1',
+  });
+
+  const tokenWrite = setItem.mock.calls.find(
+    ([key]) => key === AUTH_SESSION_KEY,
+  );
+  expect(tokenWrite).toBeDefined();
+  expect(JSON.parse(tokenWrite![1])).toMatchObject({
+    tokenType: 'Bearer',
+    accessToken: 'access-token-from-api',
+    refreshToken: 'refresh-token-from-api',
+  });
+  const storeWrite = [...setItem.mock.calls]
+    .reverse()
+    .find(([key]) => key === STORAGE_KEY);
+  expect(storeWrite).toBeDefined();
+  expect(JSON.parse(storeWrite![1]).auth).toEqual({
+    isLoggedIn: true,
+    email: 'user@example.com',
+  });
+  expect(setItem.mock.calls.map(([, value]) => value).join('\n')).not.toContain(
+    'secret1',
+  );
+
+  await press(renderer, { testID: 'account-logout' });
+  await press(renderer, { testID: 'logout-confirm' });
+  await ReactTestRenderer.act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  expect(renderer.root.findByProps({ children: 'Guest shopper' })).toBeTruthy();
+  expect(removeItem).toHaveBeenCalledWith(AUTH_SESSION_KEY);
+  const logoutStoreWrite = [...setItem.mock.calls]
+    .reverse()
+    .find(([key]) => key === STORAGE_KEY);
+  expect(JSON.parse(logoutStoreWrite![1]).auth).toEqual({
+    isLoggedIn: false,
+    email: '',
+  });
+
+  await ReactTestRenderer.act(async () => renderer.unmount());
+});
+
+test('hydrates local data and renders the home screen', async () => {
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
     renderer = ReactTestRenderer.create(<App />);
@@ -46,56 +147,22 @@ test('hydrates local data and renders the home screen', async () => {
   await ReactTestRenderer.act(async () => renderer.unmount());
 });
 
-test('starts in guest mode and supports optional local sign in', async () => {
-  getItem.mockResolvedValueOnce(null);
-  let renderer!: ReactTestRenderer.ReactTestRenderer;
-  await ReactTestRenderer.act(async () => {
-    renderer = ReactTestRenderer.create(<App />);
-  });
-
-  await press(renderer, { accessibilityLabel: 'Account' });
-  expect(renderer.root.findByProps({ children: 'Guest shopper' })).toBeTruthy();
-  await press(renderer, { testID: 'account-login' });
-  await ReactTestRenderer.act(async () => {
-    renderer.root
-      .findByProps({ testID: 'login-email' })
-      .props.onChangeText('USER@example.com');
-    renderer.root
-      .findByProps({ testID: 'login-password' })
-      .props.onChangeText('secret1');
-  });
-  await press(renderer, { testID: 'login-submit' });
-
-  expect(
-    renderer.root.findByProps({ children: 'user@example.com' }),
-  ).toBeTruthy();
-  expect(renderer.root.findByProps({ children: 'SIGNED IN' })).toBeTruthy();
-  const saved = JSON.parse(setItem.mock.calls.at(-1)![1]);
-  expect(saved.auth).toEqual({
-    isLoggedIn: true,
-    email: 'user@example.com',
-  });
-  expect(JSON.stringify(saved)).not.toContain('secret1');
-
-  await press(renderer, { testID: 'account-logout' });
-  await press(renderer, { testID: 'logout-confirm' });
-  expect(renderer.root.findByProps({ children: 'Guest shopper' })).toBeTruthy();
-  expect(JSON.parse(setItem.mock.calls.at(-1)![1]).auth).toEqual({
-    isLoggedIn: false,
-    email: '',
-  });
-
-  await ReactTestRenderer.act(async () => renderer.unmount());
-});
-
 test('offers a retry after a local-data read failure', async () => {
   let failRead!: (reason: Error) => void;
-  getItem.mockReturnValueOnce(
-    new Promise((_, reject) => {
-      failRead = reject;
-    }),
-  );
-  getItem.mockResolvedValueOnce(null);
+  let storeReads = 0;
+  getItem.mockImplementation(key => {
+    if (key === AUTH_SESSION_KEY) return Promise.resolve(null);
+    if (key !== STORAGE_KEY) {
+      return Promise.reject(new Error(`Unexpected storage key: ${key}`));
+    }
+    storeReads += 1;
+    if (storeReads === 1) {
+      return new Promise((_, reject) => {
+        failRead = reject;
+      });
+    }
+    return Promise.resolve(null);
+  });
 
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
@@ -119,14 +186,13 @@ test('offers a retry after a local-data read failure', async () => {
     retry!.props.onPress();
   });
 
-  expect(getItem).toHaveBeenCalledTimes(2);
+  expect(storeReads).toBe(2);
   expect(renderer.root.findByProps({ testID: 'home-shop-now' })).toBeTruthy();
 
   await ReactTestRenderer.act(async () => renderer.unmount());
 });
 
 test('completes a local checkout and shows the saved order', async () => {
-  getItem.mockResolvedValueOnce(null);
   let renderer!: ReactTestRenderer.ReactTestRenderer;
   await ReactTestRenderer.act(async () => {
     renderer = ReactTestRenderer.create(<App />);

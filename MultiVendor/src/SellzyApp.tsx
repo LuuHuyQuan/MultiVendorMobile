@@ -11,6 +11,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNav } from './components/SellzyUI';
 import {
+  clearSession,
+  hasStoredSession,
+  login,
+  register,
+} from './api/auth';
+import {
   changeQuantity,
   createOrder,
   normalizeCoupon,
@@ -31,6 +37,8 @@ import {
   OrderSuccessScreen,
 } from './screens/CheckoutScreens';
 import HomeScreen from './screens/HomeScreen';
+import AuthScreen from './screens/AuthScreen';
+import WalletScreen from './screens/WalletScreen';
 import { ProductDetailsScreen, ShopScreen } from './screens/ShopScreens';
 import { emptyStore, loadStore, saveStore, StoreData } from './storage';
 import { COLORS } from './theme';
@@ -74,11 +82,18 @@ export default function SellzyApp() {
   useEffect(() => {
     let mounted = true;
     setLoadError(false);
-    loadStore()
-      .then(saved => {
+    Promise.all([loadStore(), hasStoredSession()])
+      .then(([saved, hasSession]) => {
         if (mounted) {
-          dataRef.current = saved;
-          setData(saved);
+          const restored =
+            hasSession && saved.auth.email
+              ? {
+                  ...saved,
+                  auth: { isLoggedIn: true, email: saved.auth.email },
+                }
+              : { ...saved, auth: { ...defaultAuthSession } };
+          dataRef.current = restored;
+          setData(restored);
           setReady(true);
         }
       })
@@ -105,8 +120,9 @@ export default function SellzyApp() {
       () => setSaveError(true),
     );
   };
-  const startFresh = () => {
+  const startFresh = async () => {
     const fresh = emptyStore();
+    await clearSession().catch(() => undefined);
     saveStore(fresh).then(
       () => {
         dataRef.current = fresh;
@@ -214,6 +230,63 @@ export default function SellzyApp() {
     }));
     openCart();
     setToast('Order items added to your cart');
+  };
+  const finishAuthentication = async (email: string, fullName?: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    await commit(current => ({
+      ...current,
+      auth: { isLoggedIn: true, email: normalizedEmail },
+      profile: {
+        ...current.profile,
+        email: normalizedEmail,
+        name:
+          fullName?.trim() ||
+          current.profile.name ||
+          normalizedEmail
+            .split('@')[0]
+            .replace(/[._-]+/g, ' ')
+            .replace(/\b\w/g, letter => letter.toUpperCase()),
+      },
+    }));
+    setRoutes(current => {
+      const activeRoute = current[current.length - 1];
+      const base =
+        activeRoute?.name === 'auth' ? current.slice(0, -1) : current;
+      const destination =
+        activeRoute?.name === 'auth' && activeRoute.returnTo === 'wallet'
+          ? 'wallet'
+          : 'account';
+      if (base[base.length - 1]?.name === destination) return base;
+      return [
+        ...base,
+        {
+          name: destination,
+          key: `${destination}-${++sequence.current}`,
+        },
+      ];
+    });
+    setToast('Signed in successfully');
+  };
+  const signIn = async (email: string, password: string) => {
+    await login({ email, password });
+    await finishAuthentication(email);
+  };
+  const createAccount = async (
+    fullName: string,
+    email: string,
+    password: string,
+  ) => {
+    await register({ fullName, email, password });
+    await login({ email, password });
+    await finishAuthentication(email, fullName);
+  };
+  const signOut = async () => {
+    await clearSession().catch(() => undefined);
+    await commit(current => ({
+      ...current,
+      auth: { ...defaultAuthSession },
+    }));
+    setToast('You are now signed out');
   };
 
   if (!ready) {
@@ -374,31 +447,8 @@ export default function SellzyApp() {
           <AccountScreen
             {...shared}
             auth={auth}
-            onLogin={email => {
-              const normalizedEmail = email.trim().toLowerCase();
-              commit(current => ({
-                ...current,
-                auth: { isLoggedIn: true, email: normalizedEmail },
-                profile: {
-                  ...current.profile,
-                  email: normalizedEmail,
-                  name:
-                    current.profile.name ||
-                    normalizedEmail
-                      .split('@')[0]
-                      .replace(/[._-]+/g, ' ')
-                      .replace(/\b\w/g, letter => letter.toUpperCase()),
-                },
-              }));
-              setToast('Signed in successfully');
-            }}
-            onLogout={() => {
-              commit(current => ({
-                ...current,
-                auth: { ...defaultAuthSession },
-              }));
-              setToast('You are now signed out');
-            }}
+            onAuth={() => push({ name: 'auth', returnTo: 'account' })}
+            onLogout={signOut}
             profile={profile}
             onSaveProfile={next => {
               commit(current => ({ ...current, profile: next }));
@@ -408,8 +458,30 @@ export default function SellzyApp() {
             onOrders={() => goRoot('orders')}
             onSellers={() => push({ name: 'sellers' })}
             onWishlist={() => goRoot('wishlist')}
+            onWallet={() =>
+              auth.isLoggedIn
+                ? push({ name: 'wallet' })
+                : push({ name: 'auth', returnTo: 'wallet' })
+            }
             orderCount={orders.length}
             wishlistCount={wishlistIds.length}
+          />
+        );
+      case 'auth':
+        return (
+          <AuthScreen
+            onBack={goBack}
+            onLogin={signIn}
+            onRegister={createAccount}
+          />
+        );
+      case 'wallet':
+        return (
+          <WalletScreen
+            onBack={goBack}
+            onRequireLogin={() =>
+              push({ name: 'auth', returnTo: 'wallet' })
+            }
           />
         );
       case 'sellers':

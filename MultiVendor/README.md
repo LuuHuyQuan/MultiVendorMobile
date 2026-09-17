@@ -8,13 +8,14 @@
 - Chi tiết sản phẩm, sản phẩm yêu thích và giỏ hàng có kiểm tra tồn kho.
 - Mã ưu đãi `SELLZY10` giảm 10% giá trị sản phẩm.
 - Checkout 3 bước (giao hàng, thanh toán, kiểm tra đơn), có form thẻ demo không lưu dữ liệu thẻ; lưu đơn hàng cục bộ và hỗ trợ thêm lại sản phẩm từ đơn cũ.
-- Đăng nhập/đăng xuất tùy chọn trên thiết bị; người dùng vẫn có thể mua hàng ngay ở chế độ khách.
+- Đăng ký, đăng nhập/đăng xuất tùy chọn qua API; access token được tự làm mới và người dùng vẫn có thể mua hàng ngay ở chế độ khách.
+- Ví cá nhân đồng bộ với back-end: số dư khả dụng/tạm giữ, liên kết tài khoản ngân hàng, nạp tiền, rút tiền và lịch sử giao dịch.
 - Hồ sơ khách hàng, danh sách nhà bán và bản nháp đăng ký nhà bán.
 - Dữ liệu giỏ hàng, yêu thích, hồ sơ, đơn hàng và bản nháp được lưu bằng AsyncStorage.
 
 ## Phạm vi bản demo
 
-Đây là ứng dụng demo chạy cục bộ. Danh mục được đóng gói trong ứng dụng; chưa có máy chủ, xác thực tài khoản thật, cổng thanh toán, vận chuyển, thông báo đẩy, hỗ trợ trực tuyến hoặc quy trình duyệt nhà bán. Đăng nhập hiện là mô phỏng cục bộ và không lưu mật khẩu. Thao tác **Place Demo Order** chỉ lưu đơn trên thiết bị, không thu tiền và không tạo vận đơn.
+Danh mục, giỏ hàng và checkout hiện vẫn là dữ liệu demo cục bộ. Xác thực và ví cá nhân dùng API của dự án `MultiVendorEcommercePlatform`; mật khẩu không được lưu trên thiết bị. Thao tác **Place Demo Order** chỉ lưu đơn trên thiết bị, không thu tiền và không tạo vận đơn. Các yêu cầu nạp/rút tiền được gửi tới back-end và tuân theo trạng thái xử lý của hệ thống.
 
 ## Yêu cầu phát triển
 
@@ -45,6 +46,20 @@ Có thể khởi động trực tiếp bản web bằng Expo CLI:
 ```powershell
 npm run start:expo
 ```
+
+### Kết nối back-end
+
+Sao chép `.env.example` thành `.env`, sau đó đặt địa chỉ API phù hợp:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+- Expo web trên cùng máy: `EXPO_PUBLIC_API_BASE_URL=https://localhost:7226/api`.
+- Android emulator: `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:5027/api`.
+- Thiết bị thật: dùng địa chỉ IP LAN của máy chạy back-end, ví dụ `http://192.168.1.10:5027/api`.
+
+Nếu không tạo `.env`, ứng dụng tự dùng HTTPS localhost cho web và địa chỉ emulator cho Android. Cần khởi động back-end ASP.NET của dự án `MultiVendorEcommercePlatform` trước khi đăng nhập hoặc mở ví. Sau khi đổi `.env`, hãy khởi động lại Expo.
 
 Để mở Expo CLI cho Android/iOS, dùng `npm run start:expo:native`.
 

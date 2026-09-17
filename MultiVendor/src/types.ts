@@ -70,6 +70,8 @@ export type RouteName =
   | 'orders'
   | 'wishlist'
   | 'account'
+  | 'auth'
+  | 'wallet'
   | 'sellers'
   | 'help';
 
@@ -82,4 +84,5 @@ export type Route = {
   sort?: SortMode;
   key?: string;
   orderId?: string;
+  returnTo?: 'account' | 'wallet';
 };

@@ -359,7 +359,7 @@ type AccountProps = {
   orderCount: number;
   auth: AuthSession;
   profile: AccountProfile;
-  onLogin: (email: string) => void;
+  onAuth: () => void;
   onLogout: () => void;
   onSaveProfile: (profile: AccountProfile) => void;
   onCart: () => void;
@@ -367,6 +367,7 @@ type AccountProps = {
   onWishlist: () => void;
   onSellers: () => void;
   onHelp: () => void;
+  onWallet: () => void;
 };
 
 export function AccountScreen({
@@ -376,7 +377,7 @@ export function AccountScreen({
   orderCount,
   auth,
   profile,
-  onLogin,
+  onAuth,
   onLogout,
   onSaveProfile,
   onCart,
@@ -384,9 +385,9 @@ export function AccountScreen({
   onWishlist,
   onSellers,
   onHelp,
+  onWallet,
 }: AccountProps) {
   const [editor, setEditor] = useState<ProfileEditor | null>(null);
-  const [showLogin, setShowLogin] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
   const initials = profile.name.trim()
     ? profile.name
@@ -434,7 +435,7 @@ export function AccountScreen({
             accessibilityLabel={auth.isLoggedIn ? 'Edit profile' : 'Sign in'}
             accessibilityRole="button"
             onPress={() =>
-              auth.isLoggedIn ? setEditor('profile') : setShowLogin(true)
+              auth.isLoggedIn ? setEditor('profile') : onAuth()
             }
             style={styles.editButton}
             testID="account-auth-button"
@@ -486,6 +487,16 @@ export function AccountScreen({
               : 'Demo card payment preferred'
           }
         />
+        <MenuItem
+          icon="wallet"
+          label="Personal Wallet"
+          onPress={onWallet}
+          subtitle={
+            auth.isLoggedIn
+              ? 'Balance, banks, top-ups and withdrawals'
+              : 'Sign in to open your wallet'
+          }
+        />
 
         <Text style={styles.menuSection}>MARKETPLACE</Text>
         <MenuItem
@@ -520,7 +531,7 @@ export function AccountScreen({
         ) : (
           <Pressable
             accessibilityRole="button"
-            onPress={() => setShowLogin(true)}
+            onPress={onAuth}
             style={styles.loginButton}
             testID="account-login"
           >
@@ -529,7 +540,7 @@ export function AccountScreen({
         )}
         <Text style={styles.profileNote}>
           {auth.isLoggedIn
-            ? 'Signed in on this device. Your password is never saved.'
+            ? 'Your secure session is shared with the Sellzy service. Your password is never saved.'
             : 'You can shop and checkout as a guest. Sign in is optional.'}
         </Text>
         <Text style={styles.version}>Sellzy Mobile · Version 1.0.0</Text>
@@ -543,16 +554,6 @@ export function AccountScreen({
             setEditor(null);
           }}
           profile={profile}
-        />
-      ) : null}
-      {showLogin ? (
-        <LoginForm
-          initialEmail={profile.email}
-          onClose={() => setShowLogin(false)}
-          onLogin={email => {
-            onLogin(email);
-            setShowLogin(false);
-          }}
         />
       ) : null}
       {showLogout ? (
@@ -579,86 +580,6 @@ export function AccountScreen({
         </AccountDialog>
       ) : null}
     </View>
-  );
-}
-
-function LoginForm({
-  initialEmail,
-  onLogin,
-  onClose,
-}: {
-  initialEmail: string;
-  onLogin: (email: string) => void;
-  onClose: () => void;
-}) {
-  const [email, setEmail] = useState(initialEmail);
-  const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>(
-    {},
-  );
-  const submit = () => {
-    const normalizedEmail = email.trim().toLowerCase();
-    const nextErrors: typeof errors = {};
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
-      nextErrors.email = 'Enter a valid email address.';
-    }
-    if (password.length < 6) {
-      nextErrors.password = 'Password must contain at least 6 characters.';
-    }
-    if (Object.keys(nextErrors).length) {
-      setErrors(nextErrors);
-      return;
-    }
-    onLogin(normalizedEmail);
-  };
-  return (
-    <AccountDialog
-      onClose={onClose}
-      subtitle="Optional — you can continue shopping as a guest"
-      title="Sign in to Sellzy"
-    >
-      <AccountNotice>
-        Demo sign-in works with any valid email and a password of 6 or more
-        characters. The password is not stored or sent anywhere.
-      </AccountNotice>
-      <AccountField
-        autoCapitalize="none"
-        autoComplete="email"
-        error={errors.email}
-        keyboardType="email-address"
-        label="Email address"
-        onChangeText={value => {
-          setEmail(value);
-          setErrors(current => ({ ...current, email: undefined }));
-        }}
-        placeholder="you@example.com"
-        testID="login-email"
-        value={email}
-      />
-      <AccountField
-        autoCapitalize="none"
-        autoComplete="password"
-        error={errors.password}
-        label="Password"
-        onChangeText={value => {
-          setPassword(value);
-          setErrors(current => ({ ...current, password: undefined }));
-        }}
-        onSubmitEditing={submit}
-        placeholder="At least 6 characters"
-        secureTextEntry
-        testID="login-password"
-        value={password}
-      />
-      <AccountAction label="Sign in" onPress={submit} testID="login-submit" />
-      <Pressable
-        accessibilityRole="button"
-        onPress={onClose}
-        style={styles.continueGuestButton}
-      >
-        <Text style={styles.continueGuestText}>Continue as guest</Text>
-      </Pressable>
-    </AccountDialog>
   );
 }
 
