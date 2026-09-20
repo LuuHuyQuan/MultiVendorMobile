@@ -69,28 +69,28 @@ describe('checkout totals', () => {
     expect(calculateTotals({ 'vitamin-c-1000': 2 }, ' sellzy10 ')).toEqual({
       subtotal: 54.98,
       discount: 5.5,
-      shipping: 0,
-      total: 49.48,
+      shipping: 30,
+      total: 79.48,
       itemCount: 2,
     });
     expect(calculateTotals({ 'vitamin-c-1000': 1 }, 'SELLZY10')).toEqual({
       subtotal: 27.49,
       discount: 2.75,
-      shipping: 4.99,
-      total: 29.73,
+      shipping: 30,
+      total: 54.74,
       itemCount: 1,
     });
   });
 
-  test('free shipping uses the $35 merchandise threshold before the discount', () => {
-    expect(calculateTotals({ thermometer: 1 }).shipping).toBe(4.99);
+  test('free shipping uses the 500.000 dong merchandise threshold before the discount', () => {
+    expect(calculateTotals({ thermometer: 1 }).shipping).toBe(30);
     expect(
       calculateTotals({ 'vitamin-c-1000': 1, 'hand-sanitizer': 1 }, 'SELLZY10'),
     ).toEqual({
       subtotal: 37.24,
       discount: 3.72,
-      shipping: 0,
-      total: 33.52,
+      shipping: 30,
+      total: 63.52,
       itemCount: 2,
     });
   });
@@ -198,7 +198,7 @@ describe('delivery and orders', () => {
     );
     expect(order).toMatchObject({
       id: 'SZ-test',
-      date: 'Sep 8, 2026',
+      date: '8 thg 9, 2026',
       status: 'Processing',
       simulated: true,
       ...calculateTotals(cart, 'SELLZY10'),

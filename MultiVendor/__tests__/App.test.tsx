@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import ReactTestRenderer from 'react-test-renderer';
 import App from '../App';
 import { STORAGE_KEY } from '../src/storage';
+import { money } from '../src/theme';
 
 const getItem = jest.mocked(AsyncStorage.getItem);
 const setItem = jest.mocked(AsyncStorage.setItem);
@@ -67,10 +68,12 @@ test('signs a guest in through the API, persists tokens, and logs out', async ()
 
   expect(getItem).toHaveBeenCalledWith(STORAGE_KEY);
   expect(getItem).toHaveBeenCalledWith(AUTH_SESSION_KEY);
-  await press(renderer, { accessibilityLabel: 'Account' });
-  expect(renderer.root.findByProps({ children: 'Guest shopper' })).toBeTruthy();
+  await press(renderer, { accessibilityLabel: 'Tài khoản' });
+  expect(renderer.root.findByProps({ children: 'Khách mua sắm' })).toBeTruthy();
   await press(renderer, { testID: 'account-login' });
-  expect(renderer.root.findByProps({ children: 'Welcome back' })).toBeTruthy();
+  expect(
+    renderer.root.findByProps({ children: 'Chào mừng trở lại' }),
+  ).toBeTruthy();
   await ReactTestRenderer.act(async () => {
     renderer.root
       .findByProps({ testID: 'auth-email' })
@@ -84,7 +87,7 @@ test('signs a guest in through the API, persists tokens, and logs out', async ()
   expect(
     renderer.root.findByProps({ children: 'user@example.com' }),
   ).toBeTruthy();
-  expect(renderer.root.findByProps({ children: 'SIGNED IN' })).toBeTruthy();
+  expect(renderer.root.findByProps({ children: 'ĐÃ ĐĂNG NHẬP' })).toBeTruthy();
   expect(fetchMock).toHaveBeenCalledTimes(1);
   const [loginUrl, loginRequest] = fetchMock.mock.calls[0];
   expect(loginUrl).toMatch(/\/auth\/login$/);
@@ -121,7 +124,7 @@ test('signs a guest in through the API, persists tokens, and logs out', async ()
     await Promise.resolve();
     await Promise.resolve();
   });
-  expect(renderer.root.findByProps({ children: 'Guest shopper' })).toBeTruthy();
+  expect(renderer.root.findByProps({ children: 'Khách mua sắm' })).toBeTruthy();
   expect(removeItem).toHaveBeenCalledWith(AUTH_SESSION_KEY);
   const logoutStoreWrite = [...setItem.mock.calls]
     .reverse()
@@ -174,7 +177,7 @@ test('offers a retry after a local-data read failure', async () => {
 
   expect(
     renderer.root.findByProps({
-      children: 'Your saved shopping data could not be opened.',
+      children: 'Không thể mở dữ liệu mua sắm đã lưu.',
     }),
   ).toBeTruthy();
   const retry = renderer.root
@@ -206,10 +209,10 @@ test('completes a local checkout and shows the saved order', async () => {
       .findByProps({ testID: 'coupon-input' })
       .props.onChangeText('sellzy10');
   });
-  await press(renderer, { accessibilityLabel: 'Apply coupon' });
+  await press(renderer, { accessibilityLabel: 'Áp dụng mã ưu đãi' });
   expect(
     renderer.root.findByProps({
-      children: 'SELLZY10 applied — you saved $2.75!',
+      children: `Đã áp dụng SELLZY10 — bạn tiết kiệm ${money(2.75)}!`,
     }),
   ).toBeTruthy();
 
@@ -227,7 +230,7 @@ test('completes a local checkout and shows the saved order', async () => {
   }
 
   await press(renderer, { testID: 'checkout-continue-payment' });
-  await press(renderer, { accessibilityLabel: 'Credit or debit card' });
+  await press(renderer, { accessibilityLabel: 'Thẻ tín dụng hoặc ghi nợ' });
   const cardValues = [
     ['card-holder', 'Jane Nguyen'],
     ['card-number', '4242424242424242'],
@@ -241,13 +244,17 @@ test('completes a local checkout and shows the saved order', async () => {
   }
   await press(renderer, { testID: 'checkout-review-order' });
   expect(
-    renderer.root.findByProps({ children: 'Demo card ending 4242' }),
+    renderer.root.findByProps({ children: 'Thẻ mẫu kết thúc bằng 4242' }),
   ).toBeTruthy();
 
   await press(renderer, { testID: 'place-order' });
-  expect(renderer.root.findByProps({ children: 'Order saved!' })).toBeTruthy();
+  expect(
+    renderer.root.findByProps({ children: 'Đã lưu đơn hàng!' }),
+  ).toBeTruthy();
   await press(renderer, { testID: 'view-orders' });
-  expect(renderer.root.findByProps({ children: 'Saved locally' })).toBeTruthy();
+  expect(
+    renderer.root.findByProps({ children: 'Đã lưu trên thiết bị' }),
+  ).toBeTruthy();
 
   const saved = JSON.parse(setItem.mock.calls.at(-1)![1]);
   expect(saved.cart).toEqual({});

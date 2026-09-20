@@ -106,8 +106,8 @@ export function OrdersScreen({
               <Icon color={COLORS.white} name="info" size={16} />
             </View>
             <Text style={styles.infoText}>
-              Đơn hàng được lưu trên thiết bị này. Mở tóm tắt để xem sản phẩm
-              và thông tin giao hàng; chưa có thanh toán hoặc vận chuyển thực tế.
+              Đơn hàng được lưu trên thiết bị này. Mở tóm tắt để xem sản phẩm và
+              thông tin giao hàng; chưa có thanh toán hoặc vận chuyển thực tế.
             </Text>
           </View>
           {orders.map(order => (
@@ -133,10 +133,10 @@ export function OrdersScreen({
                     {order.simulated
                       ? 'Đã lưu trên thiết bị'
                       : order.status === 'Processing'
-                        ? 'Đang xử lý'
-                        : order.status === 'Shipped'
-                          ? 'Đang giao'
-                          : 'Đã giao'}
+                      ? 'Đang xử lý'
+                      : order.status === 'Shipped'
+                      ? 'Đang giao'
+                      : 'Đã giao'}
                   </Text>
                 </View>
               </View>
@@ -438,11 +438,11 @@ export function AccountScreen({
             </View>
           </View>
           <Pressable
-            accessibilityLabel={auth.isLoggedIn ? 'Chỉnh sửa hồ sơ' : 'Đăng nhập'}
-            accessibilityRole="button"
-            onPress={() =>
-              auth.isLoggedIn ? setEditor('profile') : onAuth()
+            accessibilityLabel={
+              auth.isLoggedIn ? 'Chỉnh sửa hồ sơ' : 'Đăng nhập'
             }
+            accessibilityRole="button"
+            onPress={() => (auth.isLoggedIn ? setEditor('profile') : onAuth())}
             style={styles.editButton}
             testID="account-auth-button"
           >
@@ -643,8 +643,7 @@ function ProfileForm({
     }
     if (mode === 'address') {
       if (cleaned.address.length < 5) {
-        nextErrors.address =
-          'Vui lòng nhập địa chỉ có ít nhất 5 ký tự.';
+        nextErrors.address = 'Vui lòng nhập địa chỉ có ít nhất 5 ký tự.';
       }
       if (cleaned.city.length < 2) {
         nextErrors.city = 'Vui lòng nhập tỉnh/thành phố.';
@@ -660,7 +659,8 @@ function ProfileForm({
       {mode === 'profile' ? (
         <>
           <AccountNotice>
-            Lưu thông tin trên thiết bị để thanh toán nhanh hơn trong những lần sau.
+            Lưu thông tin trên thiết bị để thanh toán nhanh hơn trong những lần
+            sau.
           </AccountNotice>
           <AccountField
             autoCapitalize="words"
@@ -891,8 +891,7 @@ export function SellersScreen({
             <View style={styles.sellerCopy}>
               <Text style={styles.sellerName}>{seller.name}</Text>
               <Text style={styles.sellerMeta}>
-                {seller.productCount}{' '}
-                {seller.productCount === 1 ? 'sản phẩm' : 'sản phẩm'} đang có
+                {seller.productCount} sản phẩm đang có
               </Text>
               <Text style={styles.verified}>
                 Đánh giá danh mục {seller.rating.toFixed(1)} / 5
@@ -1141,7 +1140,8 @@ export function HelpScreen({
         <View style={styles.contactCard}>
           <Text style={styles.contactTitle}>Về trải nghiệm này</Text>
           <Text style={styles.contactText}>
-            Sellzy là ứng dụng mua sắm mẫu với danh mục và luồng thanh toán trên thiết bị.
+            Sellzy là ứng dụng mua sắm mẫu với danh mục và luồng thanh toán trên
+            thiết bị.
           </Text>
           <Text style={styles.contactHours}>
             Phiên bản này chưa kết nối hỗ trợ khách hàng trực tiếp.
@@ -1405,7 +1405,12 @@ const styles = StyleSheet.create({
   menuIcon: { color: COLORS.teal, fontSize: 16, fontWeight: '900' },
   menuCopy: { flex: 1, paddingHorizontal: 12 },
   menuLabel: { color: COLORS.ink, fontSize: 13, fontWeight: '800' },
-  menuSubtitle: { color: COLORS.muted, fontSize: 12, lineHeight: 17, marginTop: 3 },
+  menuSubtitle: {
+    color: COLORS.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 3,
+  },
   menuArrow: { color: COLORS.muted, fontSize: 25 },
   signOutButton: {
     height: 49,

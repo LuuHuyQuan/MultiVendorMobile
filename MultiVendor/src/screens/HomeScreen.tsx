@@ -43,9 +43,21 @@ const benefits: { icon: IconName; title: string; text: string }[] = [
     title: 'Miễn phí vận chuyển',
     text: 'Đơn hàng từ 500.000 ₫',
   },
-  { icon: 'heart', title: 'Sản phẩm yêu thích', text: 'Lưu lại sản phẩm bạn thích' },
-  { icon: 'package', title: 'Đơn hàng của bạn', text: 'Quản lý dễ dàng tại một nơi' },
-  { icon: 'credit-card', title: 'Thanh toán đơn giản', text: 'Hỗ trợ thanh toán khi nhận hàng' },
+  {
+    icon: 'heart',
+    title: 'Sản phẩm yêu thích',
+    text: 'Lưu lại sản phẩm bạn thích',
+  },
+  {
+    icon: 'package',
+    title: 'Đơn hàng của bạn',
+    text: 'Quản lý dễ dàng tại một nơi',
+  },
+  {
+    icon: 'credit-card',
+    title: 'Thanh toán đơn giản',
+    text: 'Hỗ trợ thanh toán khi nhận hàng',
+  },
 ];
 
 const healthTips = [
@@ -156,7 +168,8 @@ export default function HomeScreen({
           Chăm sóc sức khỏe mỗi ngày, gọn trong một nơi.
         </Text>
         <Text style={styles.heroText}>
-          Khám phá thương hiệu đáng tin cậy, sản phẩm thiết yếu và ưu đãi riêng cho bạn.
+          Khám phá thương hiệu đáng tin cậy, sản phẩm thiết yếu và ưu đãi riêng
+          cho bạn.
         </Text>
         <View style={styles.heroBottom}>
           <Pressable
@@ -287,6 +300,7 @@ export default function HomeScreen({
               onOpen={() => onOpenProduct(product.id)}
               onToggleLike={() => onToggleLike(product.id)}
               product={product}
+              testIDPrefix="home-best-"
             />
           ))}
       </ScrollView>
@@ -326,7 +340,11 @@ export default function HomeScreen({
             accessibilityLabel="Khám phá ưu đãi vitamin"
             accessibilityRole="button"
             onPress={() => onShop('Vitamins', undefined, 'discount')}
-            style={({ pressed }) => [styles.promoCard, styles.promoCardGold, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.promoCard,
+              styles.promoCardGold,
+              pressed && styles.pressed,
+            ]}
           >
             <Text style={styles.promoCardEyebrow}>ƯU ĐÃI CÓ THỜI HẠN</Text>
             <Text style={styles.promoCardTitle}>
@@ -347,7 +365,11 @@ export default function HomeScreen({
             accessibilityLabel="Khám phá thiết bị chăm sóc sức khỏe"
             accessibilityRole="button"
             onPress={() => onShop('Devices')}
-            style={({ pressed }) => [styles.promoCard, styles.promoCardMint, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.promoCard,
+              styles.promoCardMint,
+              pressed && styles.pressed,
+            ]}
           >
             <Text style={styles.promoCardEyebrow}>THIẾT YẾU CHO SỨC KHỎE</Text>
             <Text style={styles.promoCardTitle}>
@@ -391,6 +413,7 @@ export default function HomeScreen({
               onOpen={() => onOpenProduct(product.id)}
               onToggleLike={() => onToggleLike(product.id)}
               product={product}
+              testIDPrefix="home-new-"
             />
           ))}
       </ScrollView>
@@ -853,7 +876,11 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: COLORS.white,
   },
-  promoCardLinkText: { color: COLORS.tealDark, fontSize: 12, fontWeight: '900' },
+  promoCardLinkText: {
+    color: COLORS.tealDark,
+    fontSize: 12,
+    fontWeight: '900',
+  },
   promoCardImage: {
     position: 'absolute',
     width: '47%',

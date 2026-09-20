@@ -16,6 +16,7 @@ import { EmptyState, ScreenHeader, sharedStyles } from '../components/SellzyUI';
 import { products } from '../data/catalog';
 import {
   calculateTotals,
+  FREE_SHIPPING_THRESHOLD,
   validateDelivery,
   validateDemoCard,
 } from '../commerce';
@@ -63,6 +64,10 @@ export function CartScreen({
     cart,
     couponCode,
   );
+  const remainingForFreeShipping = Math.max(
+    0,
+    FREE_SHIPPING_THRESHOLD - subtotal,
+  );
 
   return (
     <View style={[sharedStyles.screen, { paddingTop: topInset }]}>
@@ -98,6 +103,27 @@ export function CartScreen({
               />
             ))}
 
+            <View style={styles.shippingNotice}>
+              <View style={styles.shippingNoticeIcon}>
+                <Icon color={COLORS.teal} name="truck" size={19} />
+              </View>
+              <Text style={styles.shippingNoticeText}>
+                {remainingForFreeShipping > 0 ? (
+                  <>
+                    Mua thêm{' '}
+                    <Text style={styles.shippingNoticeStrong}>
+                      {money(remainingForFreeShipping)}
+                    </Text>{' '}
+                    để được miễn phí vận chuyển.
+                  </>
+                ) : (
+                  <Text style={styles.shippingNoticeStrong}>
+                    Đơn hàng của bạn đã đủ điều kiện miễn phí vận chuyển.
+                  </Text>
+                )}
+              </Text>
+            </View>
+
             <Text style={styles.cardHeading}>Bạn có mã ưu đãi?</Text>
             <View style={styles.couponRow}>
               <TextInput
@@ -131,7 +157,9 @@ export function CartScreen({
               >
                 {couponError
                   ? 'Mã ưu đãi không hợp lệ. Hãy thử SELLZY10.'
-                  : `Đã áp dụng ${couponCode} — bạn tiết kiệm ${money(discount)}!`}
+                  : `Đã áp dụng ${couponCode} — bạn tiết kiệm ${money(
+                      discount,
+                    )}!`}
               </Text>
             ) : null}
             {couponApplied ? (
@@ -504,8 +532,8 @@ export function CheckoutScreen({
                   <View style={styles.demoNotice}>
                     <Icon name="shield" color="#77601A" size={18} />
                     <Text style={styles.demoNoticeText}>
-                      Đây là bản mẫu. Dùng số 4242 4242 4242 4242. Thông tin
-                      thẻ không bao giờ được lưu hoặc gửi đi.
+                      Đây là bản mẫu. Dùng số 4242 4242 4242 4242. Thông tin thẻ
+                      không bao giờ được lưu hoặc gửi đi.
                     </Text>
                   </View>
                   <CheckoutField
@@ -542,7 +570,7 @@ export function CheckoutScreen({
                         error={paymentAttempted ? cardErrors.expiry : undefined}
                         testID="card-expiry"
                         keyboardType="number-pad"
-                    label="Ngày hết hạn"
+                        label="Ngày hết hạn"
                         maxLength={5}
                         onChangeText={value => {
                           const digits = value.replace(/\D/g, '').slice(0, 4);
@@ -617,7 +645,9 @@ export function CheckoutScreen({
                   styles.checkoutActionButton,
                 ]}
               >
-                <Text style={sharedStyles.primaryButtonText}>Xem lại đơn hàng</Text>
+                <Text style={sharedStyles.primaryButtonText}>
+                  Xem lại đơn hàng
+                </Text>
               </Pressable>
             </View>
           </>
@@ -663,7 +693,8 @@ export function CheckoutScreen({
                       .slice(-4)}`}
               </Text>
               <Text style={styles.reviewText}>
-                Bản mẫu trên thiết bị không thực hiện bất kỳ khoản thanh toán nào.
+                Bản mẫu trên thiết bị không thực hiện bất kỳ khoản thanh toán
+                nào.
               </Text>
             </View>
             <CheckoutSummary
@@ -714,8 +745,8 @@ export function CheckoutScreen({
               </Pressable>
             </View>
             <Text style={styles.secureText}>
-              Khi đặt đơn mẫu, bạn chỉ lưu tóm tắt đơn hàng trên thiết bị.
-              Không có thanh toán hoặc vận chuyển nào được khởi tạo.
+              Khi đặt đơn mẫu, bạn chỉ lưu tóm tắt đơn hàng trên thiết bị. Không
+              có thanh toán hoặc vận chuyển nào được khởi tạo.
             </Text>
           </>
         ) : null}
@@ -965,6 +996,30 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   removeText: { color: COLORS.red, fontSize: 12, fontWeight: '800' },
+  shippingNotice: {
+    padding: 14,
+    marginTop: 2,
+    borderRadius: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.tealSoft,
+  },
+  shippingNoticeIcon: {
+    width: 35,
+    height: 35,
+    marginRight: 10,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+  },
+  shippingNoticeText: {
+    flex: 1,
+    color: COLORS.tealDark,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  shippingNoticeStrong: { color: COLORS.teal, fontWeight: '900' },
   cardHeading: {
     color: COLORS.ink,
     fontSize: 15,

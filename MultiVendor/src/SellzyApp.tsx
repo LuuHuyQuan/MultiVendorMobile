@@ -10,12 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNav } from './components/SellzyUI';
-import {
-  clearSession,
-  hasStoredSession,
-  login,
-  register,
-} from './api/auth';
+import { clearSession, hasStoredSession, login, register } from './api/auth';
 import {
   changeQuantity,
   createOrder,
@@ -174,7 +169,10 @@ export default function SellzyApp() {
       cart: changeQuantity(current.cart, id, existing + quantity),
     }));
     setToast(
-      `Đã thêm ${Math.min(quantity, product.stock - existing)} sản phẩm vào giỏ hàng.`,
+      `Đã thêm ${Math.min(
+        quantity,
+        product.stock - existing,
+      )} sản phẩm vào giỏ hàng.`,
     );
   };
   const openCart = () => push({ name: 'cart' });
@@ -485,9 +483,7 @@ export default function SellzyApp() {
         return (
           <WalletScreen
             onBack={goBack}
-            onRequireLogin={() =>
-              push({ name: 'auth', returnTo: 'wallet' })
-            }
+            onRequireLogin={() => push({ name: 'auth', returnTo: 'wallet' })}
           />
         );
       case 'sellers':

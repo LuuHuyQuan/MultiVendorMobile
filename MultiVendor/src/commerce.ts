@@ -9,8 +9,8 @@ import type {
 
 const productMap = new Map(products.map(product => [product.id, product]));
 const cents = (amount: number) => Math.round(amount * 100);
-const freeShippingThreshold = 500;
-const standardShippingFee = 30;
+export const FREE_SHIPPING_THRESHOLD = 500;
+export const STANDARD_SHIPPING_FEE = 30;
 
 export function normalizeCart(value: unknown): CartQuantities {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -63,9 +63,9 @@ export function calculateTotals(cart: CartQuantities, coupon = '') {
     : 0;
   // Miễn phí giao hàng được tính trên giá trị sản phẩm trước khuyến mãi.
   const shippingCents =
-    subtotalCents === 0 || subtotalCents >= cents(freeShippingThreshold)
+    subtotalCents === 0 || subtotalCents >= cents(FREE_SHIPPING_THRESHOLD)
       ? 0
-      : cents(standardShippingFee);
+      : cents(STANDARD_SHIPPING_FEE);
   return {
     subtotal: subtotalCents / 100,
     discount: discountCents / 100,
@@ -89,7 +89,8 @@ export function validateDelivery(
   }
   if (details.address.trim().length < 5)
     errors.address = 'Vui lòng nhập địa chỉ nhận hàng.';
-  if (details.city.trim().length < 2) errors.city = 'Vui lòng nhập tỉnh/thành phố.';
+  if (details.city.trim().length < 2)
+    errors.city = 'Vui lòng nhập tỉnh/thành phố.';
   if (details.payment !== 'cash' && details.payment !== 'card')
     errors.payment = 'Vui lòng chọn phương thức thanh toán.';
   return errors;

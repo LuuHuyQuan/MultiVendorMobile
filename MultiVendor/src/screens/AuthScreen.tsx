@@ -393,7 +393,9 @@ export function AuthScreen({
               ]}
               testID="auth-continue-guest"
             >
-              <Text style={styles.guestButtonText}>Tiếp tục với tư cách khách</Text>
+              <Text style={styles.guestButtonText}>
+                Tiếp tục với tư cách khách
+              </Text>
               <Icon color={COLORS.teal} name="chevron-right" size={17} />
             </Pressable>
 

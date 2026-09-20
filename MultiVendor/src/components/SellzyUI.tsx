@@ -148,6 +148,7 @@ type ProductCardProps = {
   product: Product;
   liked: boolean;
   compact?: boolean;
+  testIDPrefix?: string;
   onOpen: () => void;
   onAdd: () => void;
   onToggleLike: () => void;
@@ -157,6 +158,7 @@ export function ProductCard({
   product,
   liked,
   compact,
+  testIDPrefix = '',
   onOpen,
   onAdd,
   onToggleLike,
@@ -177,7 +179,7 @@ export function ProductCard({
         <Pressable
           accessibilityLabel={`Xem ${product.name}, ${money(product.price)}`}
           accessibilityRole="button"
-          testID={`product-${product.id}`}
+          testID={`${testIDPrefix}product-${product.id}`}
           onPress={onOpen}
           style={styles.productImageButton}
         >
@@ -196,7 +198,7 @@ export function ProductCard({
           }: ${product.name}`}
           accessibilityRole="button"
           accessibilityState={{ selected: liked }}
-          testID={`wishlist-${product.id}`}
+          testID={`${testIDPrefix}wishlist-${product.id}`}
           hitSlop={8}
           onPress={event => {
             event.stopPropagation();
@@ -243,7 +245,7 @@ export function ProductCard({
         accessibilityRole="button"
         accessibilityState={{ disabled: product.stock === 0 }}
         disabled={product.stock === 0}
-        testID={`add-${product.id}`}
+        testID={`${testIDPrefix}add-${product.id}`}
         onPress={event => {
           event.stopPropagation();
           onAdd();
