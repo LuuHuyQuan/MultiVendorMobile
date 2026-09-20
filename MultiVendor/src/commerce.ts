@@ -9,6 +9,8 @@ import type {
 
 const productMap = new Map(products.map(product => [product.id, product]));
 const cents = (amount: number) => Math.round(amount * 100);
+const freeShippingThreshold = 500;
+const standardShippingFee = 30;
 
 export function normalizeCart(value: unknown): CartQuantities {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -60,7 +62,10 @@ export function calculateTotals(cart: CartQuantities, coupon = '') {
     ? Math.round(subtotalCents * 0.1)
     : 0;
   // Miễn phí giao hàng được tính trên giá trị sản phẩm trước khuyến mãi.
-  const shippingCents = subtotalCents === 0 || subtotalCents >= 3500 ? 0 : 499;
+  const shippingCents =
+    subtotalCents === 0 || subtotalCents >= cents(freeShippingThreshold)
+      ? 0
+      : cents(standardShippingFee);
   return {
     subtotal: subtotalCents / 100,
     discount: discountCents / 100,

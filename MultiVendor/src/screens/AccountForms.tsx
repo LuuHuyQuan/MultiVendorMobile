@@ -45,7 +45,7 @@ export function AccountDialog({
               ) : null}
             </View>
             <Pressable
-              accessibilityLabel={`Close ${title}`}
+              accessibilityLabel={`Đóng ${title}`}
               accessibilityRole="button"
               onPress={onClose}
               style={styles.close}

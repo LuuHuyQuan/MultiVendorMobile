@@ -37,8 +37,8 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function getFriendlyError(error: unknown, mode: AuthMode) {
   const fallback =
     mode === 'login'
-      ? 'Khong the dang nhap. Vui long thu lai.'
-      : 'Khong the tao tai khoan. Vui long thu lai.';
+      ? 'Không thể đăng nhập. Vui lòng thử lại.'
+      : 'Không thể tạo tài khoản. Vui lòng thử lại.';
 
   if (!(error instanceof Error)) return fallback;
 
@@ -50,7 +50,7 @@ function getFriendlyError(error: unknown, mode: AuthMode) {
     lowerMessage.includes('offline') ||
     lowerMessage.includes('failed to fetch')
   ) {
-    return 'Kiem tra ket noi internet roi thu lai.';
+    return 'Kiểm tra kết nối internet rồi thử lại.';
   }
 
   if (
@@ -59,7 +59,7 @@ function getFriendlyError(error: unknown, mode: AuthMode) {
       lowerMessage.includes('credential') ||
       lowerMessage.includes('401'))
   ) {
-    return 'Email hoac mat khau chua chinh xac.';
+    return 'Email hoặc mật khẩu chưa chính xác.';
   }
 
   if (
@@ -69,7 +69,7 @@ function getFriendlyError(error: unknown, mode: AuthMode) {
       lowerMessage.includes('conflict') ||
       lowerMessage.includes('409'))
   ) {
-    return 'Email nay da duoc dang ky.';
+    return 'Email này đã được đăng ký.';
   }
 
   return fallback;
@@ -120,22 +120,22 @@ export function AuthScreen({
 
     if (mode === 'register') {
       if (!cleanName) {
-        nextErrors.fullName = 'Vui long nhap ho va ten.';
+        nextErrors.fullName = 'Vui lòng nhập họ và tên.';
       } else if (cleanName.length < 2) {
-        nextErrors.fullName = 'Ho ten can co it nhat 2 ky tu.';
+        nextErrors.fullName = 'Họ tên cần có ít nhất 2 ký tự.';
       }
     }
 
     if (!cleanEmail) {
-      nextErrors.email = 'Vui long nhap dia chi email.';
+      nextErrors.email = 'Vui lòng nhập địa chỉ email.';
     } else if (!emailPattern.test(cleanEmail)) {
-      nextErrors.email = 'Nhap dia chi email hop le.';
+      nextErrors.email = 'Nhập địa chỉ email hợp lệ.';
     }
 
     if (!password) {
-      nextErrors.password = 'Vui long nhap mat khau.';
+      nextErrors.password = 'Vui lòng nhập mật khẩu.';
     } else if (mode === 'register' && password.length < 8) {
-      nextErrors.password = 'Mat khau can co it nhat 8 ky tu.';
+      nextErrors.password = 'Mật khẩu cần có ít nhất 8 ký tự.';
     }
 
     setErrors(nextErrors);
@@ -163,11 +163,11 @@ export function AuthScreen({
     }
   };
 
-  const title = mode === 'login' ? 'Chao mung tro lai' : 'Tao tai khoan Sellzy';
+  const title = mode === 'login' ? 'Chào mừng trở lại' : 'Tạo tài khoản Sellzy';
   const subtitle =
     mode === 'login'
-      ? 'Dang nhap de quan ly thong tin mua sam cua ban.'
-      : 'Tao tai khoan de mua sam thuan tien hon.';
+      ? 'Đăng nhập để quản lý thông tin mua sắm của bạn.'
+      : 'Tạo tài khoản để mua sắm thuận tiện hơn.';
 
   return (
     <KeyboardAvoidingView
@@ -197,8 +197,8 @@ export function AuthScreen({
           >
             <View style={styles.heroTopRow}>
               <Pressable
-                accessibilityHint="Tiep tuc mua sam ma khong can dang nhap"
-                accessibilityLabel="Quay lai"
+                accessibilityHint="Tiếp tục mua sắm mà không cần đăng nhập"
+                accessibilityLabel="Quay lại"
                 accessibilityRole="button"
                 hitSlop={8}
                 onPress={onBack}
@@ -222,8 +222,8 @@ export function AuthScreen({
             <View style={styles.heroCopy}>
               <Text style={styles.eyebrow}>
                 {mode === 'login'
-                  ? 'RAT VUI KHI GAP LAI'
-                  : 'MUA SAM THEO CACH CUA BAN'}
+                  ? 'RẤT VUI KHI GẶP LẠI'
+                  : 'MUA SẮM THEO CÁCH CỦA BẠN'}
               </Text>
               <Text accessibilityRole="header" style={styles.heroTitle}>
                 {title}
@@ -239,26 +239,26 @@ export function AuthScreen({
               <ModeButton
                 active={mode === 'login'}
                 disabled={loading}
-                label="Dang nhap"
+                label="Đăng nhập"
                 onPress={() => changeMode('login')}
                 testID="auth-mode-login"
               />
               <ModeButton
                 active={mode === 'register'}
                 disabled={loading}
-                label="Dang ky"
+                label="Đăng ký"
                 onPress={() => changeMode('register')}
                 testID="auth-mode-register"
               />
             </View>
 
             <Text style={styles.formTitle}>
-              {mode === 'login' ? 'Dang nhap tai khoan' : 'Tao tai khoan'}
+              {mode === 'login' ? 'Đăng nhập tài khoản' : 'Tạo tài khoản'}
             </Text>
             <Text style={styles.formSubtitle}>
               {mode === 'login'
-                ? 'Nhap thong tin ben duoi de tiep tuc.'
-                : 'Chi can vai thong tin la ban co the bat dau.'}
+                ? 'Nhập thông tin bên dưới để tiếp tục.'
+                : 'Chỉ cần vài thông tin là bạn có thể bắt đầu.'}
             </Text>
 
             {mode === 'register' ? (
@@ -268,13 +268,13 @@ export function AuthScreen({
                 editable={!loading}
                 error={errors.fullName}
                 icon="user"
-                label="Ho va ten"
+                label="Họ và tên"
                 onChangeText={value => {
                   setFullName(value);
                   clearFieldError('fullName');
                 }}
                 onSubmitEditing={() => emailInput.current?.focus()}
-                placeholder="Nhap ho va ten"
+                placeholder="Nhập họ và tên"
                 returnKeyType="next"
                 testID="auth-full-name"
                 textContentType="name"
@@ -290,7 +290,7 @@ export function AuthScreen({
               icon="mail"
               inputRef={emailInput}
               keyboardType="email-address"
-              label="Dia chi email"
+              label="Địa chỉ email"
               onChangeText={value => {
                 setEmail(value);
                 clearFieldError('email');
@@ -312,14 +312,14 @@ export function AuthScreen({
               error={errors.password}
               icon="shield"
               inputRef={passwordInput}
-              label="Mat khau"
+              label="Mật khẩu"
               onChangeText={value => {
                 setPassword(value);
                 clearFieldError('password');
               }}
               onSubmitEditing={submit}
               placeholder={
-                mode === 'register' ? 'It nhat 8 ky tu' : 'Nhap mat khau'
+                mode === 'register' ? 'Ít nhất 8 ký tự' : 'Nhập mật khẩu'
               }
               returnKeyType="done"
               secureTextEntry={!showPassword}
@@ -329,7 +329,7 @@ export function AuthScreen({
             >
               <Pressable
                 accessibilityLabel={
-                  showPassword ? 'An mat khau' : 'Hien mat khau'
+                  showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'
                 }
                 accessibilityRole="button"
                 hitSlop={8}
@@ -337,7 +337,7 @@ export function AuthScreen({
                 style={styles.passwordAction}
               >
                 <Text style={styles.passwordActionText}>
-                  {showPassword ? 'An' : 'Hien'}
+                  {showPassword ? 'Ẩn' : 'Hiện'}
                 </Text>
               </Pressable>
             </AuthField>
@@ -370,7 +370,7 @@ export function AuthScreen({
               ) : (
                 <>
                   <Text style={styles.submitText}>
-                    {mode === 'login' ? 'Dang nhap' : 'Tao tai khoan'}
+                    {mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}
                   </Text>
                   <Icon color={COLORS.white} name="arrow-right" size={18} />
                 </>
@@ -379,12 +379,12 @@ export function AuthScreen({
 
             <View style={styles.guestDividerRow}>
               <View style={styles.guestDivider} />
-              <Text style={styles.guestDividerText}>KHONG CAN TAI KHOAN</Text>
+              <Text style={styles.guestDividerText}>KHÔNG CẦN TÀI KHOẢN</Text>
               <View style={styles.guestDivider} />
             </View>
 
             <Pressable
-              accessibilityHint="Quay ve Sellzy va mua sam khong can tai khoan"
+              accessibilityHint="Quay về Sellzy và mua sắm không cần tài khoản"
               accessibilityRole="button"
               onPress={onBack}
               style={({ pressed }) => [
@@ -393,13 +393,13 @@ export function AuthScreen({
               ]}
               testID="auth-continue-guest"
             >
-              <Text style={styles.guestButtonText}>Tiep tuc voi tu cach khach</Text>
+              <Text style={styles.guestButtonText}>Tiếp tục với tư cách khách</Text>
               <Icon color={COLORS.teal} name="chevron-right" size={17} />
             </Pressable>
 
             <Text style={styles.guestNote}>
-              Ban van co the xem, luu yeu thich va mua sam ma khong can dang
-              nhap.
+              Bạn vẫn có thể xem, lưu yêu thích và mua sắm mà không cần đăng
+              nhập.
             </Text>
           </View>
         </View>

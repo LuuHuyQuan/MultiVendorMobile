@@ -13,4 +13,11 @@ export const COLORS = {
   orange: '#F19938',
 };
 
-export const money = (value: number) => `$${value.toFixed(2)}`;
+const vndFormatter = new Intl.NumberFormat('vi-VN', {
+  style: 'currency',
+  currency: 'VND',
+  maximumFractionDigits: 0,
+});
+
+// Catalogue prices are stored in thousands of đồng, matching the web storefront.
+export const money = (value: number) => vndFormatter.format(Math.round(value * 1000));

@@ -38,10 +38,38 @@ const categoryIcons: Record<string, IconName> = {
   Nutrition: 'leaf',
 };
 const benefits: { icon: IconName; title: string; text: string }[] = [
-  { icon: 'truck', title: 'Miễn phí vận chuyển', text: 'Đơn hàng từ $35' },
+  {
+    icon: 'truck',
+    title: 'Miễn phí vận chuyển',
+    text: 'Đơn hàng từ 500.000 ₫',
+  },
   { icon: 'heart', title: 'Sản phẩm yêu thích', text: 'Lưu lại sản phẩm bạn thích' },
   { icon: 'package', title: 'Đơn hàng của bạn', text: 'Quản lý dễ dàng tại một nơi' },
   { icon: 'credit-card', title: 'Thanh toán đơn giản', text: 'Hỗ trợ thanh toán khi nhận hàng' },
+];
+
+const healthTips = [
+  {
+    category: 'Mẹo sức khỏe',
+    image: require('../assets/vitamin-b12.png'),
+    title: 'Duy trì năng lượng cho một ngày chủ động',
+    text: 'Một vài thói quen nhỏ giúp bạn chăm sóc sức khỏe tốt hơn mỗi ngày.',
+    shopCategory: 'Wellness',
+  },
+  {
+    category: 'Dinh dưỡng',
+    image: require('../assets/apple-juice.png'),
+    title: 'Chọn thực phẩm phù hợp cho cả gia đình',
+    text: 'Khám phá những lựa chọn tiện lợi cho nhịp sống cân bằng.',
+    shopCategory: 'Nutrition',
+  },
+  {
+    category: 'Chăm sóc tại nhà',
+    image: require('../assets/bp-machine.png'),
+    title: 'Theo dõi sức khỏe ngay tại nhà',
+    text: 'Thiết bị dễ dùng giúp bạn chủ động hơn khi chăm sóc người thân.',
+    shopCategory: 'Devices',
+  },
 ];
 
 export default function HomeScreen({
@@ -237,26 +265,135 @@ export default function HomeScreen({
           ))}
       </ScrollView>
 
+      <SectionHeading
+        action="Xem tất cả"
+        onAction={() => onShop(undefined, undefined, 'popular')}
+        subtitle="Được khách hàng lựa chọn và đánh giá cao"
+        title="Sản phẩm bán chạy"
+      />
+      <ScrollView
+        contentContainerStyle={styles.productList}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {[...products]
+          .sort((a, b) => b.reviews - a.reviews)
+          .slice(0, 6)
+          .map(product => (
+            <ProductCard
+              key={product.id}
+              liked={wishlistIds.includes(product.id)}
+              onAdd={() => onAdd(product.id)}
+              onOpen={() => onOpenProduct(product.id)}
+              onToggleLike={() => onToggleLike(product.id)}
+              product={product}
+            />
+          ))}
+      </ScrollView>
+
       <View style={styles.dealBanner}>
-        <Text style={styles.dealEyebrow}>ƯU ĐÃI CÓ HẠN</Text>
-        <Text style={styles.dealTitle}>Giá tốt trong tuần</Text>
+        <Text style={styles.dealEyebrow}>SỐNG KHỎE MỖI NGÀY</Text>
+        <Text style={styles.dealTitle}>Sống năng động. Sống khỏe mạnh.</Text>
         <Text style={styles.dealText}>
-          Tiết kiệm hơn cho vitamin, chăm sóc da và sản phẩm thiết yếu.
+          Khám phá những sản phẩm đáng tin cậy cho sức khỏe của cả gia đình.
         </Text>
         <Pressable
           accessibilityRole="button"
-          onPress={() => onShop(undefined, undefined, 'discount')}
+          accessibilityLabel="Xem bộ sưu tập sống khỏe"
+          onPress={() => onShop('Wellness')}
           style={styles.dealButton}
         >
-          <Text style={styles.dealButtonText}>Khám phá ưu đãi</Text>
+          <Text style={styles.dealButtonText}>Xem bộ sưu tập</Text>
           <Icon name="arrow-right" color="#4E3E00" size={15} />
         </Pressable>
         <Image
-          source={require('../assets/vitamin-c-2.png')}
+          source={require('../assets/vitamin-c.png')}
           resizeMode="contain"
           style={styles.dealImage}
         />
+        <Image
+          source={require('../assets/bp-machine.png')}
+          resizeMode="contain"
+          style={styles.dealSecondaryImage}
+        />
       </View>
+
+      <View style={styles.promoSection}>
+        <Text style={styles.promoSectionLabel}>ƯU ĐÃI DÀNH RIÊNG CHO BẠN</Text>
+        <Text style={styles.promoSectionTitle}>Mua sắm khỏe mạnh hơn</Text>
+        <View style={styles.promoCards}>
+          <Pressable
+            accessibilityLabel="Khám phá ưu đãi vitamin"
+            accessibilityRole="button"
+            onPress={() => onShop('Vitamins', undefined, 'discount')}
+            style={({ pressed }) => [styles.promoCard, styles.promoCardGold, pressed && styles.pressed]}
+          >
+            <Text style={styles.promoCardEyebrow}>ƯU ĐÃI CÓ THỜI HẠN</Text>
+            <Text style={styles.promoCardTitle}>
+              Tiết kiệm đến 30% cho vitamin
+            </Text>
+            <Text style={styles.promoCardText}>Áp dụng đến khi hết hàng.</Text>
+            <View style={styles.promoCardLink}>
+              <Text style={styles.promoCardLinkText}>Mua ngay</Text>
+              <Icon name="arrow-right" color={COLORS.tealDark} size={15} />
+            </View>
+            <Image
+              source={require('../assets/vitamin-c-2.png')}
+              resizeMode="contain"
+              style={styles.promoCardImage}
+            />
+          </Pressable>
+          <Pressable
+            accessibilityLabel="Khám phá thiết bị chăm sóc sức khỏe"
+            accessibilityRole="button"
+            onPress={() => onShop('Devices')}
+            style={({ pressed }) => [styles.promoCard, styles.promoCardMint, pressed && styles.pressed]}
+          >
+            <Text style={styles.promoCardEyebrow}>THIẾT YẾU CHO SỨC KHỎE</Text>
+            <Text style={styles.promoCardTitle}>
+              Chăm sóc đáng tin cậy cho mọi gia đình
+            </Text>
+            <Text style={styles.promoCardText}>
+              Theo dõi sức khỏe đơn giản và chính xác.
+            </Text>
+            <View style={styles.promoCardLink}>
+              <Text style={styles.promoCardLinkText}>Khám phá</Text>
+              <Icon name="arrow-right" color={COLORS.tealDark} size={15} />
+            </View>
+            <Image
+              source={require('../assets/bp-machine.png')}
+              resizeMode="contain"
+              style={styles.promoCardImage}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      <SectionHeading
+        action="Xem tất cả"
+        onAction={() => onShop(undefined, undefined, 'price-desc')}
+        subtitle="Khám phá những sản phẩm vừa có mặt tại Sellzy"
+        title="Sản phẩm mới ra mắt"
+      />
+      <ScrollView
+        contentContainerStyle={styles.productList}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {[...products]
+          .reverse()
+          .slice(0, 6)
+          .map(product => (
+            <ProductCard
+              key={product.id}
+              liked={wishlistIds.includes(product.id)}
+              onAdd={() => onAdd(product.id)}
+              onOpen={() => onOpenProduct(product.id)}
+              onToggleLike={() => onToggleLike(product.id)}
+              product={product}
+            />
+          ))}
+      </ScrollView>
 
       <SectionHeading
         action="Xem cửa hàng"
@@ -295,6 +432,47 @@ export default function HomeScreen({
           </Pressable>
         ))}
       </View>
+
+      <SectionHeading
+        action="Xem sản phẩm"
+        onAction={() => onShop()}
+        subtitle="Gợi ý nhỏ để xây dựng lối sống cân bằng"
+        title="Góc sống khỏe"
+      />
+      <ScrollView
+        contentContainerStyle={styles.tipList}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        {healthTips.map(tip => (
+          <Pressable
+            accessibilityLabel={`Xem ${tip.category}`}
+            accessibilityRole="button"
+            key={tip.title}
+            onPress={() => onShop(tip.shopCategory)}
+            style={({ pressed }) => [styles.tipCard, pressed && styles.pressed]}
+          >
+            <View style={styles.tipImageWrap}>
+              <Image
+                source={tip.image}
+                resizeMode="contain"
+                style={styles.tipImage}
+              />
+            </View>
+            <Text style={styles.tipCategory}>{tip.category}</Text>
+            <Text numberOfLines={2} style={styles.tipTitle}>
+              {tip.title}
+            </Text>
+            <Text numberOfLines={2} style={styles.tipText}>
+              {tip.text}
+            </Text>
+            <View style={styles.tipLink}>
+              <Text style={styles.tipLinkText}>Đọc thêm</Text>
+              <Icon name="arrow-right" color={COLORS.teal} size={15} />
+            </View>
+          </Pressable>
+        ))}
+      </ScrollView>
     </ScrollView>
   );
 }
@@ -560,7 +738,7 @@ const styles = StyleSheet.create({
   },
   productList: { paddingHorizontal: 16, paddingBottom: 30, gap: 13 },
   dealBanner: {
-    minHeight: 225,
+    minHeight: 244,
     marginHorizontal: 16,
     marginBottom: 30,
     padding: 23,
@@ -575,15 +753,15 @@ const styles = StyleSheet.create({
     fontWeight: '900',
   },
   dealTitle: {
-    width: '65%',
+    width: '61%',
     color: COLORS.white,
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 24,
+    lineHeight: 30,
     fontWeight: '900',
     marginTop: 9,
   },
   dealText: {
-    width: '64%',
+    width: '61%',
     color: '#CFE3E1',
     fontSize: 13,
     lineHeight: 19,
@@ -604,10 +782,84 @@ const styles = StyleSheet.create({
   dealButtonText: { color: '#4E3E00', fontSize: 13, fontWeight: '900' },
   dealImage: {
     position: 'absolute',
-    width: 110,
-    height: 165,
-    right: 5,
-    bottom: 8,
+    width: 106,
+    height: 146,
+    right: 1,
+    bottom: 6,
+  },
+  dealSecondaryImage: {
+    position: 'absolute',
+    width: 84,
+    height: 112,
+    right: 76,
+    bottom: 11,
+    opacity: 0.88,
+  },
+  promoSection: { marginHorizontal: 16, marginBottom: 30 },
+  promoSectionLabel: {
+    color: COLORS.teal,
+    fontSize: 11,
+    letterSpacing: 0.9,
+    fontWeight: '900',
+  },
+  promoSectionTitle: {
+    color: COLORS.ink,
+    fontSize: 22,
+    lineHeight: 29,
+    fontWeight: '900',
+    marginTop: 5,
+    marginBottom: 14,
+  },
+  promoCards: { gap: 12 },
+  promoCard: {
+    minHeight: 220,
+    padding: 20,
+    borderRadius: 21,
+    overflow: 'hidden',
+  },
+  promoCardGold: { backgroundColor: '#FFF2D7' },
+  promoCardMint: { backgroundColor: '#DFF3F1' },
+  promoCardEyebrow: {
+    width: '62%',
+    color: COLORS.tealDark,
+    fontSize: 10,
+    lineHeight: 14,
+    letterSpacing: 0.7,
+    fontWeight: '900',
+  },
+  promoCardTitle: {
+    width: '62%',
+    color: COLORS.ink,
+    fontSize: 19,
+    lineHeight: 25,
+    fontWeight: '900',
+    marginTop: 7,
+  },
+  promoCardText: {
+    width: '58%',
+    color: '#59656A',
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 7,
+  },
+  promoCardLink: {
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 13,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: COLORS.white,
+  },
+  promoCardLinkText: { color: COLORS.tealDark, fontSize: 12, fontWeight: '900' },
+  promoCardImage: {
+    position: 'absolute',
+    width: '47%',
+    height: '88%',
+    right: 0,
+    bottom: 0,
   },
   sellerPreview: {
     marginHorizontal: 16,
@@ -651,4 +903,52 @@ const styles = StyleSheet.create({
     gap: 3,
     marginTop: 4,
   },
+  tipList: { paddingHorizontal: 16, paddingBottom: 30, gap: 13 },
+  tipCard: {
+    width: 246,
+    minHeight: 292,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 18,
+    backgroundColor: COLORS.white,
+  },
+  tipImageWrap: {
+    height: 126,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  tipImage: { width: '78%', height: '85%' },
+  tipCategory: {
+    color: COLORS.teal,
+    fontSize: 11,
+    fontWeight: '900',
+    marginTop: 13,
+    marginHorizontal: 14,
+  },
+  tipTitle: {
+    color: COLORS.ink,
+    fontSize: 15,
+    lineHeight: 21,
+    fontWeight: '900',
+    marginTop: 5,
+    marginHorizontal: 14,
+  },
+  tipText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 6,
+    marginHorizontal: 14,
+  },
+  tipLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 12,
+    marginHorizontal: 14,
+    marginBottom: 14,
+  },
+  tipLinkText: { color: COLORS.teal, fontSize: 12, fontWeight: '900' },
 });

@@ -166,7 +166,7 @@ export default function SellzyApp() {
     if (!product) return;
     const existing = dataRef.current.cart[id] ?? 0;
     if (existing >= product.stock) {
-      setToast('So luong da dat muc ton kho hien co.');
+      setToast('Số lượng đã đạt mức tồn kho hiện có.');
       return;
     }
     commit(current => ({
@@ -174,7 +174,7 @@ export default function SellzyApp() {
       cart: changeQuantity(current.cart, id, existing + quantity),
     }));
     setToast(
-      `Da them ${Math.min(quantity, product.stock - existing)} san pham vao gio hang.`,
+      `Đã thêm ${Math.min(quantity, product.stock - existing)} sản phẩm vào giỏ hàng.`,
     );
   };
   const openCart = () => push({ name: 'cart' });
@@ -190,7 +190,9 @@ export default function SellzyApp() {
         : [...current.wishlistIds, id],
     }));
     setToast(
-      liked ? 'Da bo khoi danh sach yeu thich.' : 'Da them vao danh sach yeu thich.',
+      liked
+        ? 'Đã bỏ khỏi danh sách yêu thích.'
+        : 'Đã thêm vào danh sách yêu thích.',
     );
   };
   const applyCoupon = (code: string) => {
@@ -209,7 +211,7 @@ export default function SellzyApp() {
       `SZ-${Date.now().toString(36).toUpperCase()}-${++sequence.current}`,
     );
     if (!order) {
-      setToast('Vui long kiem tra thong tin giao hang va gio hang.');
+      setToast('Vui lòng kiểm tra thông tin giao hàng và giỏ hàng.');
       return;
     }
     placing.current = true;
@@ -231,7 +233,7 @@ export default function SellzyApp() {
       cart: reorderCart(current.cart, order),
     }));
     openCart();
-    setToast('Da them san pham trong don vao gio hang.');
+    setToast('Đã thêm sản phẩm trong đơn vào giỏ hàng.');
   };
   const finishAuthentication = async (email: string, fullName?: string) => {
     const normalizedEmail = email.trim().toLowerCase();
@@ -267,7 +269,7 @@ export default function SellzyApp() {
         },
       ];
     });
-    setToast('Dang nhap thanh cong.');
+    setToast('Đăng nhập thành công.');
   };
   const signIn = async (email: string, password: string) => {
     await login({ email, password });
@@ -288,7 +290,7 @@ export default function SellzyApp() {
       ...current,
       auth: { ...defaultAuthSession },
     }));
-    setToast('Ban da dang xuat.');
+    setToast('Bạn đã đăng xuất.');
   };
 
   if (!ready) {
@@ -298,27 +300,29 @@ export default function SellzyApp() {
         {loadError ? (
           <>
             <Text style={styles.loadingText}>
-              Khong the mo du lieu mua sam da luu.
+              Không thể mở dữ liệu mua sắm đã lưu.
             </Text>
             <Pressable
               accessibilityRole="button"
               onPress={() => setLoadAttempt(value => value + 1)}
               style={styles.retry}
             >
-              <Text style={styles.white}>Thu lai</Text>
+              <Text style={styles.white}>Thử lại</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={startFresh}
               style={styles.fresh}
             >
-              <Text style={styles.freshText}>Bat dau voi du lieu moi tren thiet bi</Text>
+              <Text style={styles.freshText}>
+                Bắt đầu với dữ liệu mới trên thiết bị
+              </Text>
             </Pressable>
           </>
         ) : (
           <ActivityIndicator
             color={COLORS.teal}
-            accessibilityLabel="Dang tai du lieu mua sam da luu"
+            accessibilityLabel="Đang tải dữ liệu mua sắm đã lưu"
           />
         )}
       </View>
@@ -454,7 +458,7 @@ export default function SellzyApp() {
             profile={profile}
             onSaveProfile={next => {
               commit(current => ({ ...current, profile: next }));
-              setToast('Da luu ho so tren thiet bi.');
+              setToast('Đã lưu hồ sơ trên thiết bị.');
             }}
             onHelp={() => push({ name: 'help' })}
             onOrders={() => goRoot('orders')}
@@ -494,7 +498,7 @@ export default function SellzyApp() {
             vendorDraft={data.vendorDraft}
             onSaveVendorDraft={next => {
               commit(current => ({ ...current, vendorDraft: next }));
-              setToast('Da luu ban nhap cua hang tren thiet bi.');
+              setToast('Đã lưu bản nháp cửa hàng trên thiết bị.');
             }}
           />
         );
@@ -529,7 +533,7 @@ export default function SellzyApp() {
           style={styles.saveWarning}
         >
           <Text style={styles.warningText}>
-            Cac thay doi hien chi luu trong bo nho. Cham de thu luu lai.
+            Các thay đổi hiện chỉ lưu trong bộ nhớ. Chạm để thử lưu lại.
           </Text>
         </Pressable>
       ) : null}

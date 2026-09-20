@@ -85,16 +85,16 @@ export function OrdersScreen({
       <ScreenHeader
         cartCount={cartCount}
         onCart={onCart}
-        subtitle="Your saved checkout history"
-        title="My Orders"
+        subtitle="Lịch sử thanh toán đã lưu trên thiết bị"
+        title="Đơn hàng của tôi"
       />
       {!orders.length ? (
         <EmptyState
-          actionLabel="Explore Products"
+          actionLabel="Khám phá sản phẩm"
           icon="▣"
-          message="Complete a demo checkout to save an order here and view its summary."
+          message="Hoàn tất một đơn hàng mẫu để xem tóm tắt đơn hàng tại đây."
           onAction={onShop}
-          title="No orders yet"
+          title="Chưa có đơn hàng"
         />
       ) : (
         <ScrollView
@@ -106,15 +106,15 @@ export function OrdersScreen({
               <Icon color={COLORS.white} name="info" size={16} />
             </View>
             <Text style={styles.infoText}>
-              Orders are saved on this device. Open a summary to review items
-              and delivery details; no shipment or payment is created.
+              Đơn hàng được lưu trên thiết bị này. Mở tóm tắt để xem sản phẩm
+              và thông tin giao hàng; chưa có thanh toán hoặc vận chuyển thực tế.
             </Text>
           </View>
           {orders.map(order => (
             <View key={order.id} style={styles.orderCard}>
               <View style={styles.orderTop}>
                 <View>
-                  <Text style={styles.orderLabel}>ORDER {order.id}</Text>
+                  <Text style={styles.orderLabel}>ĐƠN HÀNG {order.id}</Text>
                   <Text style={styles.orderDate}>{order.date}</Text>
                 </View>
                 <View
@@ -130,7 +130,13 @@ export function OrdersScreen({
                         styles.statusDeliveredText,
                     ]}
                   >
-                    {order.simulated ? 'Saved locally' : order.status}
+                    {order.simulated
+                      ? 'Đã lưu trên thiết bị'
+                      : order.status === 'Processing'
+                        ? 'Đang xử lý'
+                        : order.status === 'Shipped'
+                          ? 'Đang giao'
+                          : 'Đã giao'}
                   </Text>
                 </View>
               </View>
@@ -139,7 +145,7 @@ export function OrdersScreen({
                   const product = getProduct(id);
                   return (
                     <Pressable
-                      accessibilityLabel={`View ${product.name}`}
+                      accessibilityLabel={`Xem ${product.name}`}
                       accessibilityRole="button"
                       key={id}
                       onPress={() => onOpenProduct(id)}
@@ -157,26 +163,26 @@ export function OrdersScreen({
               <View style={styles.orderBottom}>
                 <View>
                   <Text style={styles.orderItems}>
-                    {order.itemCount} {order.itemCount === 1 ? 'item' : 'items'}
+                    {order.itemCount} sản phẩm
                   </Text>
                   <Text style={styles.orderTotal}>{money(order.total)}</Text>
                 </View>
                 <View style={styles.orderActions}>
                   <Pressable
-                    accessibilityLabel={`View order ${order.id} details`}
+                    accessibilityLabel={`Xem chi tiết đơn hàng ${order.id}`}
                     accessibilityRole="button"
                     onPress={() => setSelectedOrder(order)}
                     style={styles.detailsButton}
                   >
-                    <Text style={styles.reorderText}>Details</Text>
+                    <Text style={styles.reorderText}>Chi tiết</Text>
                   </Pressable>
                   <Pressable
-                    accessibilityLabel={`Reorder ${order.id}`}
+                    accessibilityLabel={`Mua lại đơn hàng ${order.id}`}
                     accessibilityRole="button"
                     onPress={() => onReorder(order)}
                     style={styles.reorderButton}
                   >
-                    <Text style={styles.reorderText}>Reorder</Text>
+                    <Text style={styles.reorderText}>Mua lại</Text>
                   </Pressable>
                 </View>
               </View>
@@ -210,8 +216,8 @@ function OrderDetails({
   return (
     <AccountDialog onClose={onClose} subtitle={order.date} title={order.id}>
       <AccountNotice>
-        This is a locally saved demo order. No charge, delivery booking or live
-        tracking is connected.
+        Đây là đơn hàng mẫu được lưu trên thiết bị. Ứng dụng chưa kết nối thanh
+        toán, đặt giao hàng hoặc theo dõi trực tiếp.
       </AccountNotice>
       {order.lines?.length ? (
         order.lines.map(line => (
@@ -229,31 +235,31 @@ function OrderDetails({
         ))
       ) : (
         <AccountNotice>
-          This older order contains {order.itemCount} items. Individual line
-          prices and quantities were not saved.
+          Đơn hàng cũ này có {order.itemCount} sản phẩm. Giá và số lượng từng
+          sản phẩm chưa được lưu.
         </AccountNotice>
       )}
       <View style={styles.detailSummary}>
         {order.subtotal !== undefined ? (
-          <SummaryLine label="Subtotal" value={money(order.subtotal)} />
+          <SummaryLine label="Tạm tính" value={money(order.subtotal)} />
         ) : null}
         {order.discount ? (
           <SummaryLine
-            label={order.coupon ? `Discount · ${order.coupon}` : 'Discount'}
+            label={order.coupon ? `Giảm giá · ${order.coupon}` : 'Giảm giá'}
             value={`−${money(order.discount)}`}
           />
         ) : null}
         {order.shipping !== undefined ? (
           <SummaryLine
-            label="Delivery"
-            value={order.shipping === 0 ? 'Free' : money(order.shipping)}
+            label="Giao hàng"
+            value={order.shipping === 0 ? 'Miễn phí' : money(order.shipping)}
           />
         ) : null}
-        <SummaryLine label="Order total" value={money(order.total)} />
+        <SummaryLine label="Tổng đơn hàng" value={money(order.total)} />
       </View>
       {order.delivery ? (
         <View style={styles.deliveryCard}>
-          <Text style={styles.detailSectionTitle}>Delivery details</Text>
+          <Text style={styles.detailSectionTitle}>Thông tin giao hàng</Text>
           <Text style={styles.deliveryName}>{order.delivery.fullName}</Text>
           <Text style={styles.deliveryText}>{order.delivery.phone}</Text>
           <Text style={styles.deliveryText}>
@@ -261,16 +267,16 @@ function OrderDetails({
           </Text>
           <Text style={styles.deliveryPayment}>
             {order.delivery.payment === 'cash'
-              ? 'Cash on delivery · demo preference'
-              : 'Card · simulated payment'}
+              ? 'Thanh toán khi nhận hàng · lựa chọn mẫu'
+              : 'Thẻ · thanh toán mô phỏng'}
           </Text>
         </View>
       ) : null}
       <Text style={styles.formHelp}>
-        Reordering uses current catalogue prices and available stock. Your saved
-        order remains unchanged.
+        Mua lại sử dụng giá và tồn kho hiện tại. Đơn hàng đã lưu của bạn không
+        thay đổi.
       </Text>
-      <AccountAction label="Add items to cart" onPress={onReorder} />
+      <AccountAction label="Thêm sản phẩm vào giỏ" onPress={onReorder} />
     </AccountDialog>
   );
 }
@@ -313,16 +319,16 @@ export function WishlistScreen({
       <ScreenHeader
         cartCount={cartCount}
         onCart={onCart}
-        subtitle={`${likedProducts.length} saved items`}
-        title="My Wishlist"
+        subtitle={`${likedProducts.length} sản phẩm đã lưu`}
+        title="Sản phẩm yêu thích"
       />
       {!likedProducts.length ? (
         <EmptyState
-          actionLabel="Discover Products"
+          actionLabel="Khám phá sản phẩm"
           icon="♡"
-          message="Save products you love and they’ll be waiting here for you."
+          message="Lưu những sản phẩm bạn yêu thích, chúng sẽ luôn ở đây chờ bạn."
           onAction={onShop}
-          title="Your wishlist is empty"
+          title="Danh sách yêu thích đang trống"
         />
       ) : (
         <ScrollView
@@ -403,8 +409,8 @@ export function AccountScreen({
       <ScreenHeader
         cartCount={cartCount}
         onCart={onCart}
-        subtitle="Your shopping details, on this device"
-        title="My Account"
+        subtitle="Thông tin mua sắm trên thiết bị này"
+        title="Tài khoản của tôi"
       />
       <ScrollView
         contentContainerStyle={styles.accountContent}
@@ -417,22 +423,22 @@ export function AccountScreen({
           <View style={styles.profileCopy}>
             <Text style={styles.profileName}>
               {auth.isLoggedIn
-                ? profile.name || 'Sellzy shopper'
-                : 'Guest shopper'}
+                ? profile.name || 'Khách hàng Sellzy'
+                : 'Khách mua sắm'}
             </Text>
             <Text style={styles.profileEmail}>
               {auth.isLoggedIn
                 ? auth.email
-                : 'Shop freely — no account required'}
+                : 'Mua sắm tự do — không cần tài khoản'}
             </Text>
             <View style={styles.memberBadge}>
               <Text style={styles.memberText}>
-                {auth.isLoggedIn ? 'SIGNED IN' : 'GUEST MODE'}
+                {auth.isLoggedIn ? 'ĐÃ ĐĂNG NHẬP' : 'CHẾ ĐỘ KHÁCH'}
               </Text>
             </View>
           </View>
           <Pressable
-            accessibilityLabel={auth.isLoggedIn ? 'Edit profile' : 'Sign in'}
+            accessibilityLabel={auth.isLoggedIn ? 'Chỉnh sửa hồ sơ' : 'Đăng nhập'}
             accessibilityRole="button"
             onPress={() =>
               auth.isLoggedIn ? setEditor('profile') : onAuth()
@@ -441,81 +447,81 @@ export function AccountScreen({
             testID="account-auth-button"
           >
             <Text style={styles.editText}>
-              {auth.isLoggedIn ? 'Edit' : 'Sign in'}
+              {auth.isLoggedIn ? 'Sửa' : 'Đăng nhập'}
             </Text>
           </Pressable>
         </View>
 
         <View style={styles.accountStats}>
-          <AccountStat label="Orders" value={String(orderCount)} />
+          <AccountStat label="Đơn hàng" value={String(orderCount)} />
           <View style={styles.statDivider} />
-          <AccountStat label="Wishlist" value={String(wishlistCount)} />
+          <AccountStat label="Yêu thích" value={String(wishlistCount)} />
           <View style={styles.statDivider} />
-          <AccountStat label="Cart" value={String(cartCount)} />
+          <AccountStat label="Giỏ hàng" value={String(cartCount)} />
         </View>
 
-        <Text style={styles.menuSection}>SHOPPING</Text>
+        <Text style={styles.menuSection}>MUA SẮM</Text>
         <MenuItem
           icon="orders"
-          label="My Orders"
+          label="Đơn hàng của tôi"
           onPress={onOrders}
-          subtitle="View saved summaries or reorder"
+          subtitle="Xem tóm tắt đã lưu hoặc mua lại"
         />
         <MenuItem
           icon="heart"
-          label="Wishlist"
+          label="Sản phẩm yêu thích"
           onPress={onWishlist}
-          subtitle="Your saved items"
+          subtitle="Sản phẩm bạn đã lưu"
         />
         <MenuItem
           icon="pin"
-          label="Delivery Addresses"
+          label="Địa chỉ giao hàng"
           onPress={() => setEditor('address')}
           subtitle={
             profile.address
               ? `${profile.address}, ${profile.city}`
-              : 'Save your default delivery address'
+              : 'Lưu địa chỉ giao hàng mặc định'
           }
         />
         <MenuItem
           icon="credit-card"
-          label="Payment Methods"
+          label="Phương thức thanh toán"
           onPress={() => setEditor('payment')}
           subtitle={
             profile.payment === 'cash'
-              ? 'Cash on delivery preferred'
-              : 'Demo card payment preferred'
+              ? 'Ưu tiên thanh toán khi nhận hàng'
+              : 'Ưu tiên thanh toán thẻ mẫu'
           }
         />
         <MenuItem
           icon="wallet"
-          label="Personal Wallet"
+          label="Ví cá nhân"
           onPress={onWallet}
           subtitle={
             auth.isLoggedIn
-              ? 'Balance, banks, top-ups and withdrawals'
-              : 'Sign in to open your wallet'
+              ? 'Số dư, ngân hàng, nạp và rút tiền'
+              : 'Đăng nhập để mở ví'
           }
         />
 
-        <Text style={styles.menuSection}>MARKETPLACE</Text>
+        <Text style={styles.menuSection}>CỬA HÀNG</Text>
         <MenuItem
           icon="shop"
-          label="Our Sellers"
+          label="Các cửa hàng"
           onPress={onSellers}
-          subtitle="Browse products by store"
+          subtitle="Xem sản phẩm theo từng cửa hàng"
         />
         <MenuItem
           icon="headset"
-          label="Help & Support"
+          label="Trợ giúp & hỗ trợ"
           onPress={onHelp}
-          subtitle="Answers about shopping in this app"
+          subtitle="Giải đáp về việc mua sắm trong ứng dụng"
         />
         <MenuItem
           icon="activity"
-          label="Preferences"
+          label="Tùy chọn"
           onPress={() => setEditor('preferences')}
-          subtitle="Shopping settings and notification preference"
+          subtitle="Cài đặt mua sắm và thông báo"
         />
 
         {auth.isLoggedIn ? (
@@ -526,7 +532,7 @@ export function AccountScreen({
             testID="account-logout"
           >
             <Icon color={COLORS.red} name="logout" size={16} />
-            <Text style={styles.signOutText}>Sign out</Text>
+            <Text style={styles.signOutText}>Đăng xuất</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -535,15 +541,15 @@ export function AccountScreen({
             style={styles.loginButton}
             testID="account-login"
           >
-            <Text style={styles.loginButtonText}>Sign in to your account</Text>
+            <Text style={styles.loginButtonText}>Đăng nhập tài khoản</Text>
           </Pressable>
         )}
         <Text style={styles.profileNote}>
           {auth.isLoggedIn
-            ? 'Your secure session is shared with the Sellzy service. Your password is never saved.'
-            : 'You can shop and checkout as a guest. Sign in is optional.'}
+            ? 'Phiên đăng nhập được dùng với dịch vụ Sellzy. Mật khẩu của bạn không được lưu trên thiết bị.'
+            : 'Bạn có thể mua sắm và thanh toán với tư cách khách. Đăng nhập là tùy chọn.'}
         </Text>
-        <Text style={styles.version}>Sellzy Mobile · Version 1.0.0</Text>
+        <Text style={styles.version}>Sellzy Mobile · Phiên bản 1.0.0</Text>
       </ScrollView>
       {editor ? (
         <ProfileForm
@@ -557,13 +563,13 @@ export function AccountScreen({
         />
       ) : null}
       {showLogout ? (
-        <AccountDialog onClose={() => setShowLogout(false)} title="Sign out?">
+        <AccountDialog onClose={() => setShowLogout(false)} title="Đăng xuất?">
           <AccountNotice>
-            Your cart, wishlist, orders and local shopping details will remain
-            on this device.
+            Giỏ hàng, danh sách yêu thích, đơn hàng và thông tin mua sắm vẫn
+            được giữ trên thiết bị này.
           </AccountNotice>
           <AccountAction
-            label="Yes, sign out"
+            label="Có, đăng xuất"
             onPress={() => {
               onLogout();
               setShowLogout(false);
@@ -575,7 +581,7 @@ export function AccountScreen({
             onPress={() => setShowLogout(false)}
             style={styles.continueGuestButton}
           >
-            <Text style={styles.continueGuestText}>Stay signed in</Text>
+            <Text style={styles.continueGuestText}>Tiếp tục đăng nhập</Text>
           </Pressable>
         </AccountDialog>
       ) : null}
@@ -586,10 +592,10 @@ export function AccountScreen({
 type ProfileEditor = 'profile' | 'address' | 'payment' | 'preferences';
 
 const editorTitles: Record<ProfileEditor, string> = {
-  profile: 'Edit your profile',
-  address: 'Delivery address',
-  payment: 'Payment preference',
-  preferences: 'Preferences',
+  profile: 'Chỉnh sửa hồ sơ',
+  address: 'Địa chỉ giao hàng',
+  payment: 'Ưu tiên thanh toán',
+  preferences: 'Tùy chọn',
 };
 
 function ProfileForm({
@@ -626,22 +632,22 @@ function ProfileForm({
     const nextErrors: typeof errors = {};
     if (mode === 'profile') {
       if (cleaned.name.length < 2) {
-        nextErrors.name = 'Enter a name with at least 2 characters.';
+        nextErrors.name = 'Vui lòng nhập tên có ít nhất 2 ký tự.';
       }
       if (cleaned.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned.email)) {
-        nextErrors.email = 'Enter a valid email address or leave it empty.';
+        nextErrors.email = 'Nhập email hợp lệ hoặc để trống.';
       }
       if (cleaned.phone && !/^\+?[\d\s().-]{7,20}$/.test(cleaned.phone)) {
-        nextErrors.phone = 'Enter a valid phone number or leave it empty.';
+        nextErrors.phone = 'Nhập số điện thoại hợp lệ hoặc để trống.';
       }
     }
     if (mode === 'address') {
       if (cleaned.address.length < 5) {
         nextErrors.address =
-          'Enter a street address with at least 5 characters.';
+          'Vui lòng nhập địa chỉ có ít nhất 5 ký tự.';
       }
       if (cleaned.city.length < 2) {
-        nextErrors.city = 'Enter your city or town.';
+        nextErrors.city = 'Vui lòng nhập tỉnh/thành phố.';
       }
     }
     setErrors(nextErrors);
@@ -654,16 +660,16 @@ function ProfileForm({
       {mode === 'profile' ? (
         <>
           <AccountNotice>
-            Save your details on this device to make future checkouts easier.
+            Lưu thông tin trên thiết bị để thanh toán nhanh hơn trong những lần sau.
           </AccountNotice>
           <AccountField
             autoCapitalize="words"
             autoComplete="name"
             error={errors.name}
-            label="Full name"
+            label="Họ và tên"
             maxLength={80}
             onChangeText={value => update('name', value)}
-            placeholder="Your name"
+            placeholder="Nhập họ và tên"
             value={draft.name}
           />
           <AccountField
@@ -671,7 +677,7 @@ function ProfileForm({
             autoComplete="email"
             error={errors.email}
             keyboardType="email-address"
-            label="Email address (optional)"
+            label="Địa chỉ email (không bắt buộc)"
             maxLength={150}
             onChangeText={value => update('email', value)}
             placeholder="you@example.com"
@@ -681,10 +687,10 @@ function ProfileForm({
             autoComplete="tel"
             error={errors.phone}
             keyboardType="phone-pad"
-            label="Phone number (optional)"
+            label="Số điện thoại (không bắt buộc)"
             maxLength={20}
             onChangeText={value => update('phone', value)}
-            placeholder="Your phone number"
+            placeholder="Nhập số điện thoại"
             value={draft.phone}
           />
         </>
@@ -692,26 +698,26 @@ function ProfileForm({
       {mode === 'address' ? (
         <>
           <AccountNotice>
-            This default address will be filled in at checkout. You can review
-            or change it before saving an order.
+            Địa chỉ mặc định sẽ được điền khi thanh toán. Bạn có thể xem lại
+            hoặc thay đổi trước khi lưu đơn hàng.
           </AccountNotice>
           <AccountField
             autoComplete="street-address"
             error={errors.address}
-            label="Street address"
+            label="Địa chỉ"
             maxLength={240}
             multiline
             onChangeText={value => update('address', value)}
-            placeholder="House number, street, apartment"
+            placeholder="Số nhà, tên đường, căn hộ"
             value={draft.address}
           />
           <AccountField
             autoCapitalize="words"
             error={errors.city}
-            label="City / Town"
+            label="Tỉnh / Thành phố"
             maxLength={100}
             onChangeText={value => update('city', value)}
-            placeholder="Your city"
+            placeholder="Nhập tỉnh hoặc thành phố"
             value={draft.city}
           />
         </>
@@ -719,18 +725,18 @@ function ProfileForm({
       {mode === 'payment' ? (
         <>
           <AccountNotice>
-            Choose the default option for demo checkout. No card details are
-            collected and no money is charged.
+            Chọn phương thức mặc định cho đơn hàng mẫu. Ứng dụng không thu thập
+            thông tin thẻ và không thực hiện giao dịch thật.
           </AccountNotice>
           <PaymentOption
-            description="Saved as your preferred method."
-            label="Cash on delivery"
+            description="Được lưu làm phương thức ưu tiên."
+            label="Thanh toán khi nhận hàng"
             onPress={() => update('payment', 'cash')}
             selected={draft.payment === 'cash'}
           />
           <PaymentOption
-            description="Simulated card checkout, with no charge."
-            label="Card · demo only"
+            description="Thanh toán thẻ mô phỏng, không phát sinh giao dịch."
+            label="Thẻ · chỉ dùng để minh họa"
             onPress={() => update('payment', 'card')}
             selected={draft.payment === 'card'}
           />
@@ -740,29 +746,28 @@ function ProfileForm({
         <>
           <View style={styles.preferenceRow}>
             <View style={styles.preferenceCopy}>
-              <Text style={styles.menuLabel}>Shopping notifications</Text>
+              <Text style={styles.menuLabel}>Thông báo mua sắm</Text>
               <Text style={styles.formHelp}>
-                Save your preference. Push notifications are not connected in
-                this version.
+                Lưu tùy chọn của bạn. Phiên bản này chưa kết nối thông báo đẩy.
               </Text>
             </View>
             <Switch
-              accessibilityLabel="Shopping notification preference"
+              accessibilityLabel="Tùy chọn thông báo mua sắm"
               onValueChange={value => update('notifications', value)}
               trackColor={{ false: COLORS.border, true: COLORS.teal }}
               value={draft.notifications}
             />
           </View>
           <View style={styles.detailSummary}>
-            <SummaryLine label="Language" value="English" />
-            <SummaryLine label="Currency" value="USD ($)" />
+            <SummaryLine label="Ngôn ngữ" value="Tiếng Việt" />
+            <SummaryLine label="Tiền tệ" value="VND (₫)" />
           </View>
           <Text style={styles.formHelp}>
-            This catalogue currently uses English and US dollars.
+            Danh mục hiển thị bằng tiếng Việt và dùng đơn vị Việt Nam đồng.
           </Text>
         </>
       ) : null}
-      <AccountAction label="Save changes" onPress={save} />
+      <AccountAction label="Lưu thay đổi" onPress={save} />
     </AccountDialog>
   );
 }
@@ -859,21 +864,21 @@ export function SellersScreen({
         cartCount={cartCount}
         onBack={onBack}
         onCart={onCart}
-        subtitle="Discover the stores in our catalogue"
-        title="Our Sellers"
+        subtitle="Khám phá các cửa hàng trong danh mục"
+        title="Các cửa hàng"
       />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.sellerHero}>
-          <Text style={styles.sellerHeroEyebrow}>SELL WITH SELLZY</Text>
+          <Text style={styles.sellerHeroEyebrow}>BÁN HÀNG CÙNG SELLZY</Text>
           <Text style={styles.sellerHeroTitle}>
-            Your wellness essentials, all in one place.
+            Sản phẩm thiết yếu cho cuộc sống khỏe, gói gọn một nơi.
           </Text>
           <Text style={styles.sellerHeroText}>
-            Explore each store’s collection and find your next everyday
-            favourite.
+            Khám phá sản phẩm của từng cửa hàng và tìm lựa chọn phù hợp cho mỗi
+            ngày.
           </Text>
         </View>
         {catalogueSellers.map(seller => (
@@ -887,33 +892,33 @@ export function SellersScreen({
               <Text style={styles.sellerName}>{seller.name}</Text>
               <Text style={styles.sellerMeta}>
                 {seller.productCount}{' '}
-                {seller.productCount === 1 ? 'product' : 'products'} available
+                {seller.productCount === 1 ? 'sản phẩm' : 'sản phẩm'} đang có
               </Text>
               <Text style={styles.verified}>
-                Catalogue rating {seller.rating.toFixed(1)} / 5
+                Đánh giá danh mục {seller.rating.toFixed(1)} / 5
               </Text>
             </View>
             <Pressable
-              accessibilityLabel={`Visit ${seller.name}`}
+              accessibilityLabel={`Xem cửa hàng ${seller.name}`}
               accessibilityRole="button"
               onPress={() => onShop(seller.name)}
               style={styles.visitButton}
             >
-              <Text style={styles.visitText}>Visit</Text>
+              <Text style={styles.visitText}>Xem</Text>
             </Pressable>
           </View>
         ))}
         <View style={styles.vendorCallout}>
           <Text style={styles.vendorCalloutTitle}>
-            Grow your business with Sellzy
+            Phát triển cửa hàng cùng Sellzy
           </Text>
           <Text style={styles.vendorCalloutText}>
-            Plan your store by saving a vendor profile draft on this device.
-            Publishing and seller registration are not connected yet.
+            Lên kế hoạch cửa hàng bằng cách lưu bản nháp hồ sơ bán hàng trên
+            thiết bị. Đăng ký và xuất bản cửa hàng chưa được kết nối.
           </Text>
           {vendorDraft?.storeName ? (
             <Text style={styles.vendorDraftLabel}>
-              Saved draft: {vendorDraft.storeName}
+              Bản nháp đã lưu: {vendorDraft.storeName}
             </Text>
           ) : null}
           <Pressable
@@ -922,7 +927,9 @@ export function SellersScreen({
             style={styles.vendorButton}
           >
             <Text style={styles.vendorButtonText}>
-              {vendorDraft?.storeName ? 'Edit Vendor Draft' : 'Become a Vendor'}
+              {vendorDraft?.storeName
+                ? 'Chỉnh sửa bản nháp cửa hàng'
+                : 'Trở thành nhà bán hàng'}
             </Text>
           </Pressable>
         </View>
@@ -935,8 +942,8 @@ export function SellersScreen({
             onSaveVendorDraft(nextDraft);
             setShowVendorForm(false);
             Alert.alert(
-              'Vendor draft saved',
-              'Your store details are saved on this device. No application has been sent and no store has been published.',
+              'Đã lưu bản nháp cửa hàng',
+              'Thông tin cửa hàng đã được lưu trên thiết bị. Chưa có hồ sơ nào được gửi hoặc cửa hàng nào được xuất bản.',
             );
           }}
         />
@@ -972,16 +979,16 @@ function VendorForm({
     };
     const nextErrors: typeof errors = {};
     if (nextDraft.storeName.length < 2) {
-      nextErrors.storeName = 'Enter a store name with at least 2 characters.';
+      nextErrors.storeName = 'Vui lòng nhập tên cửa hàng có ít nhất 2 ký tự.';
     }
     if (nextDraft.ownerName.length < 2) {
-      nextErrors.ownerName = 'Enter your full name.';
+      nextErrors.ownerName = 'Vui lòng nhập họ và tên.';
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextDraft.email)) {
-      nextErrors.email = 'Enter a valid contact email.';
+      nextErrors.email = 'Vui lòng nhập email liên hệ hợp lệ.';
     }
     if (nextDraft.category.length < 2) {
-      nextErrors.category = 'Enter a product category.';
+      nextErrors.category = 'Vui lòng nhập danh mục sản phẩm.';
     }
     setErrors(nextErrors);
     if (!Object.keys(nextErrors).length) {
@@ -991,30 +998,30 @@ function VendorForm({
   return (
     <AccountDialog
       onClose={onClose}
-      subtitle="Prepare your store profile"
-      title="Your vendor draft"
+      subtitle="Chuẩn bị hồ sơ cửa hàng của bạn"
+      title="Bản nháp nhà bán hàng"
     >
       <AccountNotice>
-        Save a draft on this device. This form does not submit a seller
-        application or create a public store.
+        Lưu bản nháp trên thiết bị. Biểu mẫu này không gửi đăng ký bán hàng hoặc
+        tạo cửa hàng công khai.
       </AccountNotice>
       <AccountField
         autoCapitalize="words"
         error={errors.storeName}
-        label="Store name"
+        label="Tên cửa hàng"
         maxLength={80}
         onChangeText={value => update('storeName', value)}
-        placeholder="Your store name"
+        placeholder="Nhập tên cửa hàng"
         value={values.storeName}
       />
       <AccountField
         autoCapitalize="words"
         autoComplete="name"
         error={errors.ownerName}
-        label="Owner name"
+        label="Tên chủ cửa hàng"
         maxLength={80}
         onChangeText={value => update('ownerName', value)}
-        placeholder="Your full name"
+        placeholder="Nhập họ và tên"
         value={values.ownerName}
       />
       <AccountField
@@ -1022,7 +1029,7 @@ function VendorForm({
         autoComplete="email"
         error={errors.email}
         keyboardType="email-address"
-        label="Contact email"
+        label="Email liên hệ"
         maxLength={150}
         onChangeText={value => update('email', value)}
         placeholder="you@example.com"
@@ -1030,21 +1037,21 @@ function VendorForm({
       />
       <AccountField
         error={errors.category}
-        label="Product category"
+        label="Danh mục sản phẩm"
         maxLength={80}
         onChangeText={value => update('category', value)}
-        placeholder="e.g. Wellness"
+        placeholder="Ví dụ: Sống khỏe"
         value={values.category}
       />
       <AccountField
-        label="About your store (optional)"
+        label="Giới thiệu cửa hàng (không bắt buộc)"
         maxLength={600}
         multiline
         onChangeText={value => update('description', value)}
-        placeholder="Tell us what makes your products special"
+        placeholder="Chia sẻ điểm nổi bật của sản phẩm"
         value={values.description}
       />
-      <AccountAction label="Save draft on this device" onPress={save} />
+      <AccountAction label="Lưu bản nháp trên thiết bị" onPress={save} />
     </AccountDialog>
   );
 }
@@ -1059,32 +1066,32 @@ export function HelpScreen({
   const [expandedQuestion, setExpandedQuestion] = useState<number | null>(0);
   const questions = [
     [
-      'Where can I find my order?',
-      'Open My Orders and tap Details to see the items, total and delivery details saved at checkout. Orders stay on this device. This version does not book deliveries or provide live tracking.',
+      'Tôi xem đơn hàng ở đâu?',
+      'Mở Đơn hàng của tôi và chạm Chi tiết để xem sản phẩm, tổng tiền cùng thông tin giao hàng đã lưu khi thanh toán. Đơn hàng được lưu trên thiết bị; phiên bản này chưa đặt giao hàng hoặc theo dõi trực tiếp.',
     ],
     [
-      'Does checkout place a real order?',
-      'No. Checkout saves a demo order on your device. It does not send an order to a seller, take payment or arrange a shipment, so returns and refunds do not apply.',
+      'Thanh toán có tạo đơn hàng thật không?',
+      'Không. Thanh toán chỉ lưu đơn hàng mẫu trên thiết bị. Ứng dụng không gửi đơn cho cửa hàng, không thu tiền hoặc sắp xếp vận chuyển nên chưa áp dụng đổi trả, hoàn tiền.',
     ],
     [
-      'Which payment methods are supported?',
-      'You can choose cash on delivery or the card demo option. Both are simulated preferences; the app does not collect card numbers or charge money.',
+      'Ứng dụng hỗ trợ phương thức thanh toán nào?',
+      'Bạn có thể chọn thanh toán khi nhận hàng hoặc thẻ mẫu. Cả hai chỉ là lựa chọn mô phỏng; ứng dụng không thu thập số thẻ hoặc trừ tiền.',
     ],
     [
-      'How do I use a coupon?',
-      'Enter SELLZY10 in the cart and tap Apply for a 10% discount on the product subtotal. Review the discount in your total before continuing to checkout.',
+      'Tôi dùng mã ưu đãi như thế nào?',
+      'Nhập SELLZY10 trong giỏ hàng rồi chạm Áp dụng để giảm 10% giá trị sản phẩm. Hãy xem lại khoản giảm giá trong tổng tiền trước khi tiếp tục thanh toán.',
     ],
     [
-      'Will my cart and wishlist be saved?',
-      'Your cart, wishlist, orders and saved profile are stored on this device. They are available when you reopen the app, but are not synced to an online account. Clearing app data or uninstalling removes these details.',
+      'Giỏ hàng và danh sách yêu thích có được lưu không?',
+      'Giỏ hàng, danh sách yêu thích, đơn hàng và hồ sơ được lưu trên thiết bị này. Chúng có sẵn khi mở lại ứng dụng nhưng chưa đồng bộ với tài khoản trực tuyến. Xóa dữ liệu ứng dụng hoặc gỡ ứng dụng sẽ xóa các thông tin này.',
     ],
     [
-      'How does reordering work?',
-      'Tap Reorder in My Orders to add the saved items to your cart. Reordering uses current catalogue prices and available stock; discounts from the earlier order are not automatically reused.',
+      'Chức năng mua lại hoạt động thế nào?',
+      'Chạm Mua lại trong Đơn hàng của tôi để thêm sản phẩm đã lưu vào giỏ hàng. Việc mua lại dùng giá và tồn kho hiện tại; ưu đãi của đơn cũ không tự động được áp dụng lại.',
     ],
     [
-      'How do I become a vendor?',
-      'Open Our Sellers and tap Become a Vendor to prepare a store profile draft. The draft is saved on this device only. Seller registration and public stores are not connected.',
+      'Làm sao để trở thành nhà bán hàng?',
+      'Mở Các cửa hàng rồi chạm Trở thành nhà bán hàng để tạo bản nháp hồ sơ cửa hàng. Bản nháp chỉ được lưu trên thiết bị; đăng ký bán hàng và cửa hàng công khai chưa được kết nối.',
     ],
   ];
   return (
@@ -1092,8 +1099,8 @@ export function HelpScreen({
       <ScreenHeader
         canGoBack
         onBack={onBack}
-        subtitle="A quick guide to Sellzy"
-        title="Help & Support"
+        subtitle="Hướng dẫn nhanh khi mua sắm với Sellzy"
+        title="Trợ giúp & hỗ trợ"
       />
       <ScrollView
         contentContainerStyle={styles.content}
@@ -1103,12 +1110,12 @@ export function HelpScreen({
           <View style={styles.helpHeroIcon}>
             <Icon color={COLORS.tealDark} name="headset" size={25} />
           </View>
-          <Text style={styles.helpHeroTitle}>How can we help?</Text>
+          <Text style={styles.helpHeroTitle}>Chúng tôi có thể giúp gì?</Text>
           <Text style={styles.helpHeroText}>
-            Find answers about products, checkout and your saved details.
+            Tìm câu trả lời về sản phẩm, thanh toán và thông tin đã lưu.
           </Text>
         </View>
-        <Text style={styles.faqHeading}>Frequently asked questions</Text>
+        <Text style={styles.faqHeading}>Câu hỏi thường gặp</Text>
         {questions.map(([question, answer], index) => (
           <View key={question} style={styles.faqCard}>
             <Pressable
@@ -1132,12 +1139,12 @@ export function HelpScreen({
           </View>
         ))}
         <View style={styles.contactCard}>
-          <Text style={styles.contactTitle}>About this experience</Text>
+          <Text style={styles.contactTitle}>Về trải nghiệm này</Text>
           <Text style={styles.contactText}>
-            Sellzy is a sample shopping app with a local catalogue and checkout.
+            Sellzy là ứng dụng mua sắm mẫu với danh mục và luồng thanh toán trên thiết bị.
           </Text>
           <Text style={styles.contactHours}>
-            Live customer support is not connected in this version.
+            Phiên bản này chưa kết nối hỗ trợ khách hàng trực tiếp.
           </Text>
         </View>
       </ScrollView>
@@ -1168,8 +1175,8 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     color: COLORS.tealDark,
-    fontSize: 10,
-    lineHeight: 15,
+    fontSize: 12,
+    lineHeight: 18,
     marginLeft: 10,
   },
   orderCard: {
@@ -1186,7 +1193,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   orderLabel: { color: COLORS.ink, fontSize: 12, fontWeight: '900' },
-  orderDate: { color: COLORS.muted, fontSize: 10, marginTop: 4 },
+  orderDate: { color: COLORS.muted, fontSize: 12, marginTop: 4 },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -1194,7 +1201,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF4D2',
   },
   statusDelivered: { backgroundColor: '#E7F7EE' },
-  statusText: { color: '#8B6A00', fontSize: 9, fontWeight: '900' },
+  statusText: { color: '#8B6A00', fontSize: 11, fontWeight: '900' },
   statusDeliveredText: { color: COLORS.success },
   orderProducts: { flexDirection: 'row', gap: 8, marginVertical: 15 },
   orderProductImageWrap: {
@@ -1221,7 +1228,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginLeft: 12,
   },
-  orderItems: { color: COLORS.muted, fontSize: 9 },
+  orderItems: { color: COLORS.muted, fontSize: 12 },
   orderTotal: {
     color: COLORS.ink,
     fontSize: 17,
@@ -1301,7 +1308,7 @@ const styles = StyleSheet.create({
   deliveryPayment: {
     alignSelf: 'flex-start',
     color: COLORS.tealDark,
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '800',
     marginTop: 9,
   },
@@ -1333,7 +1340,7 @@ const styles = StyleSheet.create({
   avatarText: { color: COLORS.tealDark, fontSize: 20, fontWeight: '900' },
   profileCopy: { flex: 1, paddingHorizontal: 13 },
   profileName: { color: COLORS.white, fontSize: 16, fontWeight: '900' },
-  profileEmail: { color: '#CAE1DF', fontSize: 10, marginTop: 4 },
+  profileEmail: { color: '#CAE1DF', fontSize: 12, marginTop: 4 },
   memberBadge: {
     alignSelf: 'flex-start',
     marginTop: 7,
@@ -1344,7 +1351,7 @@ const styles = StyleSheet.create({
   },
   memberText: {
     color: '#5E4900',
-    fontSize: 7,
+    fontSize: 10,
     letterSpacing: 0.6,
     fontWeight: '900',
   },
@@ -1356,7 +1363,7 @@ const styles = StyleSheet.create({
     borderColor: '#5E9996',
     borderRadius: 15,
   },
-  editText: { color: COLORS.white, fontSize: 9, fontWeight: '800' },
+  editText: { color: COLORS.white, fontSize: 12, fontWeight: '800' },
   accountStats: {
     minHeight: 83,
     marginTop: 14,
@@ -1369,11 +1376,11 @@ const styles = StyleSheet.create({
   },
   stat: { flex: 1, alignItems: 'center' },
   statValue: { color: COLORS.ink, fontSize: 19, fontWeight: '900' },
-  statLabel: { color: COLORS.muted, fontSize: 9, marginTop: 4 },
+  statLabel: { color: COLORS.muted, fontSize: 11, marginTop: 4 },
   statDivider: { width: 1, height: 34, backgroundColor: COLORS.border },
   menuSection: {
     color: COLORS.muted,
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: 1,
     fontWeight: '900',
     marginTop: 24,
@@ -1398,7 +1405,7 @@ const styles = StyleSheet.create({
   menuIcon: { color: COLORS.teal, fontSize: 16, fontWeight: '900' },
   menuCopy: { flex: 1, paddingHorizontal: 12 },
   menuLabel: { color: COLORS.ink, fontSize: 13, fontWeight: '800' },
-  menuSubtitle: { color: COLORS.muted, fontSize: 9, marginTop: 3 },
+  menuSubtitle: { color: COLORS.muted, fontSize: 12, lineHeight: 17, marginTop: 3 },
   menuArrow: { color: COLORS.muted, fontSize: 25 },
   signOutButton: {
     height: 49,
@@ -1429,8 +1436,8 @@ const styles = StyleSheet.create({
   continueGuestText: { color: COLORS.teal, fontSize: 12, fontWeight: '800' },
   profileNote: {
     color: COLORS.muted,
-    fontSize: 10,
-    lineHeight: 16,
+    fontSize: 12,
+    lineHeight: 18,
     textAlign: 'center',
     marginTop: 10,
     paddingHorizontal: 14,
@@ -1480,7 +1487,7 @@ const styles = StyleSheet.create({
   },
   version: {
     color: '#A0A8AA',
-    fontSize: 9,
+    fontSize: 11,
     textAlign: 'center',
     marginTop: 14,
   },
@@ -1492,7 +1499,7 @@ const styles = StyleSheet.create({
   },
   sellerHeroEyebrow: {
     color: COLORS.yellow,
-    fontSize: 9,
+    fontSize: 11,
     letterSpacing: 1,
     fontWeight: '900',
   },
@@ -1505,8 +1512,8 @@ const styles = StyleSheet.create({
   },
   sellerHeroText: {
     color: '#CDE2E0',
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 19,
     marginTop: 8,
   },
   sellerCard: {
@@ -1530,13 +1537,13 @@ const styles = StyleSheet.create({
   sellerName: { color: COLORS.ink, fontSize: 14, fontWeight: '900' },
   sellerMeta: {
     color: COLORS.orange,
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '800',
     marginTop: 4,
   },
   verified: {
     color: COLORS.success,
-    fontSize: 8,
+    fontSize: 10,
     fontWeight: '800',
     marginTop: 4,
   },
@@ -1548,7 +1555,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: COLORS.teal,
   },
-  visitText: { color: COLORS.white, fontSize: 10, fontWeight: '900' },
+  visitText: { color: COLORS.white, fontSize: 12, fontWeight: '900' },
   vendorCallout: {
     padding: 21,
     marginTop: 8,
@@ -1558,8 +1565,8 @@ const styles = StyleSheet.create({
   vendorCalloutTitle: { color: COLORS.ink, fontSize: 18, fontWeight: '900' },
   vendorCalloutText: {
     color: COLORS.muted,
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 19,
     marginTop: 7,
   },
   vendorDraftLabel: {
@@ -1582,7 +1589,7 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     backgroundColor: COLORS.yellow,
   },
-  vendorButtonText: { color: '#554200', fontSize: 10, fontWeight: '900' },
+  vendorButtonText: { color: '#554200', fontSize: 13, fontWeight: '900' },
   helpHero: {
     padding: 25,
     borderRadius: 22,
@@ -1605,7 +1612,7 @@ const styles = StyleSheet.create({
   },
   helpHeroText: {
     color: '#CDE2E0',
-    fontSize: 11,
+    fontSize: 13,
     marginTop: 6,
     textAlign: 'center',
   },
@@ -1639,8 +1646,8 @@ const styles = StyleSheet.create({
   },
   faqAnswer: {
     color: COLORS.muted,
-    fontSize: 11,
-    lineHeight: 17,
+    fontSize: 13,
+    lineHeight: 19,
     marginTop: 7,
   },
   contactCard: {
@@ -1652,9 +1659,9 @@ const styles = StyleSheet.create({
   contactTitle: { color: COLORS.tealDark, fontSize: 16, fontWeight: '900' },
   contactText: {
     color: COLORS.ink,
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
     marginTop: 7,
   },
-  contactHours: { color: COLORS.muted, fontSize: 10, marginTop: 4 },
+  contactHours: { color: COLORS.muted, fontSize: 12, marginTop: 4 },
 });

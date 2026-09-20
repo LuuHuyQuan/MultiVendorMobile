@@ -153,7 +153,7 @@ export function CartScreen({
               <SummaryRow
                 label="Giảm giá"
                 positive
-                value={discount ? `−${money(discount)}` : '$0.00'}
+                value={discount ? `−${money(discount)}` : money(0)}
               />
               <SummaryRow
                 label="Vận chuyển"
