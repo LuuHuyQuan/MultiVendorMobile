@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -24,9 +23,9 @@ import {
   sharedStyles,
 } from '../components/SellzyUI';
 import { Icon, IconName } from '../components/Icon';
-import { getProduct, products, sellers } from '../data/catalog';
+import { products, sellers } from '../data/catalog';
 import { COLORS, money } from '../theme';
-import { Order } from '../types';
+import type { Order, Product } from '../types';
 import {
   AccountAction,
   AccountDialog,
@@ -43,26 +42,31 @@ const sellerColors = [
   '#FFECEA',
 ];
 
-const catalogueSellers = Array.from(
-  new Set(products.map(product => product.store)),
-).map((name, index) => {
-  const storeProducts = products.filter(product => product.store === name);
-  const listedSeller = sellers.find(seller => seller.name === name);
-  const rating =
-    storeProducts.reduce((total, product) => total + product.rating, 0) /
-    storeProducts.length;
-
-  return {
-    name,
-    color: listedSeller?.color ?? sellerColors[index % sellerColors.length],
-    productCount: storeProducts.length,
-    rating,
-  };
-});
+function getCatalogueSellers(catalogProducts: Product[]) {
+  const grouped = new Map<string, Product[]>();
+  catalogProducts.forEach(product => {
+    const listed = grouped.get(product.store) ?? [];
+    listed.push(product);
+    grouped.set(product.store, listed);
+  });
+  return [...grouped].map(([name, storeProducts], index) => {
+    const listedSeller = sellers.find(seller => seller.name === name);
+    const rating =
+      storeProducts.reduce((total, product) => total + product.rating, 0) /
+      storeProducts.length;
+    return {
+      name,
+      color: listedSeller?.color ?? sellerColors[index % sellerColors.length],
+      productCount: storeProducts.length,
+      rating,
+    };
+  });
+}
 
 type OrdersProps = {
   topInset: number;
   orders: Order[];
+  catalogProducts?: Product[];
   cartCount: number;
   onCart: () => void;
   onShop: () => void;
@@ -73,6 +77,7 @@ type OrdersProps = {
 export function OrdersScreen({
   topInset,
   orders,
+  catalogProducts = products,
   cartCount,
   onCart,
   onShop,
@@ -80,19 +85,21 @@ export function OrdersScreen({
   onReorder,
 }: OrdersProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const hasPlacedOrders = orders.some(order => order.simulated === false);
+  const hasDemoOrders = orders.some(order => order.simulated !== false);
   return (
     <View style={[sharedStyles.screen, { paddingTop: topInset }]}>
       <ScreenHeader
         cartCount={cartCount}
         onCart={onCart}
-        subtitle="Lịch sử thanh toán đã lưu trên thiết bị"
+        subtitle="Tóm tắt đơn hàng đã lưu trên thiết bị"
         title="Đơn hàng của tôi"
       />
       {!orders.length ? (
         <EmptyState
           actionLabel="Khám phá sản phẩm"
           icon="▣"
-          message="Hoàn tất một đơn hàng mẫu để xem tóm tắt đơn hàng tại đây."
+          message="Đặt một đơn hàng để xem tóm tắt tại đây."
           onAction={onShop}
           title="Chưa có đơn hàng"
         />
@@ -106,8 +113,12 @@ export function OrdersScreen({
               <Icon color={COLORS.white} name="info" size={16} />
             </View>
             <Text style={styles.infoText}>
-              Đơn hàng được lưu trên thiết bị này. Mở tóm tắt để xem sản phẩm và
-              thông tin giao hàng; chưa có thanh toán hoặc vận chuyển thực tế.
+              {hasPlacedOrders
+                ? 'Đơn đặt với cửa hàng có tóm tắt được lưu trên thiết bị này. Trạng thái hiển thị có thể chưa được cập nhật; ứng dụng chưa đồng bộ lịch sử và theo dõi giao hàng.'
+                : 'Đơn hàng mẫu được lưu trên thiết bị này. Mở chi tiết để xem sản phẩm và thông tin giao hàng; chưa có thanh toán hoặc vận chuyển thực tế.'}
+              {hasPlacedOrders && hasDemoOrders
+                ? ' Các đơn hàng mẫu trong danh sách không được gửi tới cửa hàng.'
+                : null}
             </Text>
           </View>
           {orders.map(order => (
@@ -130,7 +141,7 @@ export function OrdersScreen({
                         styles.statusDeliveredText,
                     ]}
                   >
-                    {order.simulated
+                    {order.simulated !== false
                       ? 'Đã lưu trên thiết bị'
                       : order.status === 'Processing'
                       ? 'Đang xử lý'
@@ -142,8 +153,12 @@ export function OrdersScreen({
               </View>
               <View style={styles.orderProducts}>
                 {order.productIds.slice(0, 4).map(id => {
-                  const product = getProduct(id);
-                  return (
+                  const product =
+                    catalogProducts.find(item => item.id === id) ??
+                    (order.simulated !== false
+                      ? products.find(item => item.id === id)
+                      : undefined);
+                  return product ? (
                     <Pressable
                       accessibilityLabel={`Xem ${product.name}`}
                       accessibilityRole="button"
@@ -157,6 +172,14 @@ export function OrdersScreen({
                         style={styles.orderProductImage}
                       />
                     </Pressable>
+                  ) : (
+                    <View
+                      accessibilityLabel="Sản phẩm không còn trong danh mục"
+                      key={id}
+                      style={styles.orderProductImageWrap}
+                    >
+                      <Icon color={COLORS.muted} name="shop" size={20} />
+                    </View>
                   );
                 })}
               </View>
@@ -216,8 +239,9 @@ function OrderDetails({
   return (
     <AccountDialog onClose={onClose} subtitle={order.date} title={order.id}>
       <AccountNotice>
-        Đây là đơn hàng mẫu được lưu trên thiết bị. Ứng dụng chưa kết nối thanh
-        toán, đặt giao hàng hoặc theo dõi trực tiếp.
+        {order.simulated === false
+          ? 'Đơn đã được gửi tới cửa hàng. Đây là bản tóm tắt lưu trên thiết bị; trạng thái và lịch sử giao hàng chưa được đồng bộ tự động.'
+          : 'Đây là đơn hàng mẫu được lưu trên thiết bị. Ứng dụng chưa kết nối thanh toán, đặt giao hàng hoặc theo dõi trực tiếp.'}
       </AccountNotice>
       {order.lines?.length ? (
         order.lines.map(line => (
@@ -263,12 +287,17 @@ function OrderDetails({
           <Text style={styles.deliveryName}>{order.delivery.fullName}</Text>
           <Text style={styles.deliveryText}>{order.delivery.phone}</Text>
           <Text style={styles.deliveryText}>
-            {order.delivery.address}, {order.delivery.city}
+            {order.delivery.address}
+            {order.delivery.district ? `, ${order.delivery.district}` : ''}, {order.delivery.city}
           </Text>
           <Text style={styles.deliveryPayment}>
             {order.delivery.payment === 'cash'
-              ? 'Thanh toán khi nhận hàng · lựa chọn mẫu'
-              : 'Thẻ · thanh toán mô phỏng'}
+              ? order.simulated === false
+                ? 'Thanh toán khi nhận hàng'
+                : 'Thanh toán khi nhận hàng · lựa chọn mẫu'
+              : order.simulated === false
+                ? 'Thanh toán bằng thẻ'
+                : 'Thẻ · thanh toán mô phỏng'}
           </Text>
         </View>
       ) : null}
@@ -293,6 +322,7 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
 type WishlistProps = {
   topInset: number;
   ids: string[];
+  catalogProducts?: Product[];
   cartCount: number;
   onCart: () => void;
   onShop: () => void;
@@ -304,6 +334,7 @@ type WishlistProps = {
 export function WishlistScreen({
   topInset,
   ids,
+  catalogProducts = products,
   cartCount,
   onCart,
   onShop,
@@ -313,7 +344,7 @@ export function WishlistScreen({
 }: WishlistProps) {
   const { width } = useWindowDimensions();
   const columns = width >= 750 ? 4 : width >= 550 ? 3 : width < 360 ? 1 : 2;
-  const likedProducts = products.filter(product => ids.includes(product.id));
+  const likedProducts = catalogProducts.filter(product => ids.includes(product.id));
   return (
     <View style={[sharedStyles.screen, { paddingTop: topInset }]}>
       <ScreenHeader
@@ -365,6 +396,7 @@ type AccountProps = {
   orderCount: number;
   auth: AuthSession;
   profile: AccountProfile;
+  liveCatalog?: boolean;
   onAuth: () => void;
   onLogout: () => void;
   onSaveProfile: (profile: AccountProfile) => void;
@@ -372,6 +404,7 @@ type AccountProps = {
   onOrders: () => void;
   onWishlist: () => void;
   onSellers: () => void;
+  onSellerPortal: () => void;
   onHelp: () => void;
   onWallet: () => void;
 };
@@ -383,6 +416,7 @@ export function AccountScreen({
   orderCount,
   auth,
   profile,
+  liveCatalog = false,
   onAuth,
   onLogout,
   onSaveProfile,
@@ -390,12 +424,13 @@ export function AccountScreen({
   onOrders,
   onWishlist,
   onSellers,
+  onSellerPortal,
   onHelp,
   onWallet,
 }: AccountProps) {
   const [editor, setEditor] = useState<ProfileEditor | null>(null);
   const [showLogout, setShowLogout] = useState(false);
-  const initials = profile.name.trim()
+  const initials = auth.isLoggedIn && profile.name.trim()
     ? profile.name
         .trim()
         .split(/\s+/)
@@ -403,7 +438,9 @@ export function AccountScreen({
         .map(part => part[0])
         .join('')
         .toUpperCase()
-    : 'S';
+    : auth.isLoggedIn
+      ? 'S'
+      : 'K';
   return (
     <View style={[sharedStyles.screen, { paddingTop: topInset }]}>
       <ScreenHeader
@@ -479,7 +516,9 @@ export function AccountScreen({
           onPress={() => setEditor('address')}
           subtitle={
             profile.address
-              ? `${profile.address}, ${profile.city}`
+              ? [profile.address, profile.district, profile.city]
+                  .filter(Boolean)
+                  .join(', ')
               : 'Lưu địa chỉ giao hàng mặc định'
           }
         />
@@ -488,7 +527,7 @@ export function AccountScreen({
           label="Phương thức thanh toán"
           onPress={() => setEditor('payment')}
           subtitle={
-            profile.payment === 'cash'
+            liveCatalog || profile.payment === 'cash'
               ? 'Ưu tiên thanh toán khi nhận hàng'
               : 'Ưu tiên thanh toán thẻ mẫu'
           }
@@ -511,6 +550,14 @@ export function AccountScreen({
           onPress={onSellers}
           subtitle="Xem sản phẩm theo từng cửa hàng"
         />
+        {auth.isLoggedIn ? (
+          <MenuItem
+            icon="shop"
+            label="Kênh người bán"
+            onPress={onSellerPortal}
+            subtitle="Sản phẩm và đơn hàng của cửa hàng bạn"
+          />
+        ) : null}
         <MenuItem
           icon="headset"
           label="Trợ giúp & hỗ trợ"
@@ -554,6 +601,7 @@ export function AccountScreen({
       {editor ? (
         <ProfileForm
           mode={editor}
+          liveCatalog={liveCatalog}
           onClose={() => setEditor(null)}
           onSave={nextProfile => {
             onSaveProfile(nextProfile);
@@ -565,8 +613,8 @@ export function AccountScreen({
       {showLogout ? (
         <AccountDialog onClose={() => setShowLogout(false)} title="Đăng xuất?">
           <AccountNotice>
-            Giỏ hàng, danh sách yêu thích, đơn hàng và thông tin mua sắm vẫn
-            được giữ trên thiết bị này.
+            Dữ liệu mua sắm của tài khoản này vẫn được giữ trên thiết bị và sẽ
+            xuất hiện khi bạn đăng nhập lại bằng cùng email.
           </AccountNotice>
           <AccountAction
             label="Có, đăng xuất"
@@ -601,15 +649,20 @@ const editorTitles: Record<ProfileEditor, string> = {
 function ProfileForm({
   mode,
   profile,
+  liveCatalog,
   onSave,
   onClose,
 }: {
   mode: ProfileEditor;
   profile: AccountProfile;
+  liveCatalog: boolean;
   onSave: (profile: AccountProfile) => void;
   onClose: () => void;
 }) {
-  const [draft, setDraft] = useState(profile);
+  const [draft, setDraft] = useState<AccountProfile>(() => ({
+    ...profile,
+    payment: liveCatalog ? 'cash' : profile.payment,
+  }));
   const [errors, setErrors] = useState<
     Partial<Record<keyof AccountProfile, string>>
   >({});
@@ -627,6 +680,7 @@ function ProfileForm({
       email: draft.email.trim(),
       phone: draft.phone.trim(),
       address: draft.address.trim(),
+      district: draft.district?.trim() ?? '',
       city: draft.city.trim(),
     };
     const nextErrors: typeof errors = {};
@@ -642,10 +696,16 @@ function ProfileForm({
       }
     }
     if (mode === 'address') {
-      if (cleaned.address.length < 5) {
+      const hasAddress = Boolean(
+        cleaned.address || cleaned.district || cleaned.city,
+      );
+      if (hasAddress && cleaned.address.length < 5) {
         nextErrors.address = 'Vui lòng nhập địa chỉ có ít nhất 5 ký tự.';
       }
-      if (cleaned.city.length < 2) {
+      if (hasAddress && cleaned.district.length < 2) {
+        nextErrors.district = 'Vui lòng nhập quận/huyện.';
+      }
+      if (hasAddress && cleaned.city.length < 2) {
         nextErrors.city = 'Vui lòng nhập tỉnh/thành phố.';
       }
     }
@@ -660,7 +720,7 @@ function ProfileForm({
         <>
           <AccountNotice>
             Lưu thông tin trên thiết bị để thanh toán nhanh hơn trong những lần
-            sau.
+            sau. Email liên hệ ở đây không thay đổi email dùng để đăng nhập.
           </AccountNotice>
           <AccountField
             autoCapitalize="words"
@@ -699,7 +759,8 @@ function ProfileForm({
         <>
           <AccountNotice>
             Địa chỉ mặc định sẽ được điền khi thanh toán. Bạn có thể xem lại
-            hoặc thay đổi trước khi lưu đơn hàng.
+            hoặc thay đổi trước khi lưu đơn hàng. Để trống cả hai trường để xóa
+            địa chỉ đã lưu.
           </AccountNotice>
           <AccountField
             autoComplete="street-address"
@@ -710,6 +771,15 @@ function ProfileForm({
             onChangeText={value => update('address', value)}
             placeholder="Số nhà, tên đường, căn hộ"
             value={draft.address}
+          />
+          <AccountField
+            autoCapitalize="words"
+            error={errors.district}
+            label="Quận / Huyện"
+            maxLength={100}
+            onChangeText={value => update('district', value)}
+            placeholder="Nhập quận hoặc huyện"
+            value={draft.district ?? ''}
           />
           <AccountField
             autoCapitalize="words"
@@ -725,8 +795,9 @@ function ProfileForm({
       {mode === 'payment' ? (
         <>
           <AccountNotice>
-            Chọn phương thức mặc định cho đơn hàng mẫu. Ứng dụng không thu thập
-            thông tin thẻ và không thực hiện giao dịch thật.
+            {liveCatalog
+              ? 'Đơn hàng gửi đến cửa hàng hiện hỗ trợ thanh toán khi nhận hàng.'
+              : 'Chọn phương thức mặc định cho đơn hàng mẫu. Ứng dụng không thu thập thông tin thẻ và không thực hiện giao dịch thật.'}
           </AccountNotice>
           <PaymentOption
             description="Được lưu làm phương thức ưu tiên."
@@ -734,12 +805,14 @@ function ProfileForm({
             onPress={() => update('payment', 'cash')}
             selected={draft.payment === 'cash'}
           />
-          <PaymentOption
-            description="Thanh toán thẻ mô phỏng, không phát sinh giao dịch."
-            label="Thẻ · chỉ dùng để minh họa"
-            onPress={() => update('payment', 'card')}
-            selected={draft.payment === 'card'}
-          />
+          {!liveCatalog ? (
+            <PaymentOption
+              description="Thanh toán thẻ mô phỏng, không phát sinh giao dịch."
+              label="Thẻ · chỉ dùng để minh họa"
+              onPress={() => update('payment', 'card')}
+              selected={draft.payment === 'card'}
+            />
+          ) : null}
         </>
       ) : null}
       {mode === 'preferences' ? (
@@ -842,6 +915,8 @@ function MenuItem({
 export function SellersScreen({
   topInset,
   cartCount,
+  catalogProducts = products,
+  catalogVendors,
   onBack,
   onCart,
   onShop,
@@ -850,6 +925,8 @@ export function SellersScreen({
 }: {
   topInset: number;
   cartCount: number;
+  catalogProducts?: Product[];
+  catalogVendors?: { name: string; rating: number; productCount: number }[];
   onBack: () => void;
   onCart: () => void;
   onShop: (store: string) => void;
@@ -857,6 +934,13 @@ export function SellersScreen({
   onSaveVendorDraft: (draft: VendorDraft) => void;
 }) {
   const [showVendorForm, setShowVendorForm] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
+  const catalogueSellers = catalogVendors
+    ? catalogVendors.map((vendor, index) => ({
+        ...vendor,
+        color: sellerColors[index % sellerColors.length],
+      }))
+    : getCatalogueSellers(catalogProducts);
   return (
     <View style={[sharedStyles.screen, { paddingTop: topInset }]}>
       <ScreenHeader
@@ -920,6 +1004,11 @@ export function SellersScreen({
               Bản nháp đã lưu: {vendorDraft.storeName}
             </Text>
           ) : null}
+          {draftSaved ? (
+            <Text accessibilityLiveRegion="polite" style={styles.vendorDraftLabel}>
+              Đã lưu trên thiết bị. Chưa gửi hồ sơ đăng ký cửa hàng.
+            </Text>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             onPress={() => setShowVendorForm(true)}
@@ -940,10 +1029,7 @@ export function SellersScreen({
           onSave={nextDraft => {
             onSaveVendorDraft(nextDraft);
             setShowVendorForm(false);
-            Alert.alert(
-              'Đã lưu bản nháp cửa hàng',
-              'Thông tin cửa hàng đã được lưu trên thiết bị. Chưa có hồ sơ nào được gửi hoặc cửa hàng nào được xuất bản.',
-            );
+            setDraftSaved(true);
           }}
         />
       ) : null}
@@ -1058,31 +1144,41 @@ function VendorForm({
 export function HelpScreen({
   topInset,
   onBack,
+  liveCatalog = false,
 }: {
   topInset: number;
   onBack: () => void;
+  liveCatalog?: boolean;
 }) {
   const [expandedQuestion, setExpandedQuestion] = useState<number | null>(0);
   const questions = [
     [
       'Tôi xem đơn hàng ở đâu?',
-      'Mở Đơn hàng của tôi và chạm Chi tiết để xem sản phẩm, tổng tiền cùng thông tin giao hàng đã lưu khi thanh toán. Đơn hàng được lưu trên thiết bị; phiên bản này chưa đặt giao hàng hoặc theo dõi trực tiếp.',
+      liveCatalog
+        ? 'Mở Đơn hàng của tôi và chạm Chi tiết để xem bản tóm tắt đã lưu trên thiết bị. Trạng thái đơn chưa được đồng bộ tự động từ cửa hàng.'
+        : 'Mở Đơn hàng của tôi và chạm Chi tiết để xem sản phẩm, tổng tiền cùng thông tin giao hàng đã lưu khi thanh toán. Đơn hàng được lưu trên thiết bị; phiên bản này chưa đặt giao hàng hoặc theo dõi trực tiếp.',
     ],
     [
       'Thanh toán có tạo đơn hàng thật không?',
-      'Không. Thanh toán chỉ lưu đơn hàng mẫu trên thiết bị. Ứng dụng không gửi đơn cho cửa hàng, không thu tiền hoặc sắp xếp vận chuyển nên chưa áp dụng đổi trả, hoàn tiền.',
+      liveCatalog
+        ? 'Có. Sau khi đăng nhập, đơn COD được gửi đến cửa hàng. Khi không kết nối được dịch vụ, ứng dụng chuyển về danh mục mẫu và đơn mẫu chỉ lưu trên thiết bị.'
+        : 'Không. Thanh toán chỉ lưu đơn hàng mẫu trên thiết bị. Ứng dụng không gửi đơn cho cửa hàng, không thu tiền hoặc sắp xếp vận chuyển nên chưa áp dụng đổi trả, hoàn tiền.',
     ],
     [
       'Ứng dụng hỗ trợ phương thức thanh toán nào?',
-      'Bạn có thể chọn thanh toán khi nhận hàng hoặc thẻ mẫu. Cả hai chỉ là lựa chọn mô phỏng; ứng dụng không thu thập số thẻ hoặc trừ tiền.',
+      liveCatalog
+        ? 'Đơn hàng gửi đến cửa hàng hiện hỗ trợ thanh toán khi nhận hàng. Ứng dụng không thu thập số thẻ.'
+        : 'Bạn có thể chọn thanh toán khi nhận hàng hoặc thẻ mẫu. Cả hai chỉ là lựa chọn mô phỏng; ứng dụng không thu thập số thẻ hoặc trừ tiền.',
     ],
     [
       'Tôi dùng mã ưu đãi như thế nào?',
-      'Nhập SELLZY10 trong giỏ hàng rồi chạm Áp dụng để giảm 10% giá trị sản phẩm. Hãy xem lại khoản giảm giá trong tổng tiền trước khi tiếp tục thanh toán.',
+      liveCatalog
+        ? 'Mã SELLZY10 chỉ áp dụng cho danh mục mẫu trên thiết bị. Đơn hàng gửi đến cửa hàng hiện chưa hỗ trợ mã ưu đãi.'
+        : 'Nhập SELLZY10 trong giỏ hàng rồi chạm Áp dụng để giảm 10% giá trị sản phẩm. Hãy xem lại khoản giảm giá trong tổng tiền trước khi tiếp tục thanh toán.',
     ],
     [
       'Giỏ hàng và danh sách yêu thích có được lưu không?',
-      'Giỏ hàng, danh sách yêu thích, đơn hàng và hồ sơ được lưu trên thiết bị này. Chúng có sẵn khi mở lại ứng dụng nhưng chưa đồng bộ với tài khoản trực tuyến. Xóa dữ liệu ứng dụng hoặc gỡ ứng dụng sẽ xóa các thông tin này.',
+      'Giỏ hàng, danh sách yêu thích, đơn hàng và hồ sơ được lưu riêng cho khách và từng email đăng nhập trên thiết bị này. Dữ liệu tài khoản xuất hiện khi đăng nhập lại bằng cùng email, nhưng chưa đồng bộ giữa các thiết bị. Xóa dữ liệu ứng dụng hoặc gỡ ứng dụng sẽ xóa các thông tin này.',
     ],
     [
       'Chức năng mua lại hoạt động thế nào?',

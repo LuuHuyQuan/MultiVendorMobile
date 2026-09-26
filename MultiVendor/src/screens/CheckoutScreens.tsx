@@ -28,10 +28,19 @@ import {
   DemoCardDetails,
   Product,
 } from '../types';
+
+type DisplayTotals = Pick<
+  ReturnType<typeof calculateTotals>,
+  'subtotal' | 'discount' | 'shipping' | 'total'
+>;
+
 type CartProps = {
   topInset: number;
   cart: CartQuantities;
   couponCode: string;
+  catalogProducts?: Product[];
+  liveCatalog?: boolean;
+  totalsOverride?: DisplayTotals;
   onApplyCoupon: (code: string) => boolean;
   onBack: () => void;
   onShop: () => void;
@@ -41,13 +50,38 @@ type CartProps = {
   onRemove: (id: string) => void;
 };
 
-const cartProducts = (cart: CartQuantities) =>
-  products.filter(product => (cart[product.id] ?? 0) > 0);
+const cartProducts = (cart: CartQuantities, catalogProducts: Product[]) =>
+  catalogProducts.filter(product => (cart[product.id] ?? 0) > 0);
+
+const unitPrice = (product: Product, quantity: number) =>
+  product.priceTiers
+    ?.filter(tier => tier.minQuantity <= quantity)
+    .sort((a, b) => b.minQuantity - a.minQuantity)[0]?.price ?? product.price;
+
+const screenTotals = (
+  cart: CartQuantities,
+  couponCode: string,
+  catalogProducts: Product[],
+  liveCatalog: boolean,
+  override?: DisplayTotals,
+): DisplayTotals => {
+  if (override) return override;
+  if (!liveCatalog) return calculateTotals(cart, couponCode);
+  const subtotal = cartProducts(cart, catalogProducts).reduce(
+    (sum, product) =>
+      sum + unitPrice(product, cart[product.id]) * cart[product.id],
+    0,
+  );
+  return { subtotal, discount: 0, shipping: 0, total: subtotal };
+};
 
 export function CartScreen({
   topInset,
   cart,
   couponCode,
+  catalogProducts = products,
+  liveCatalog = false,
+  totalsOverride,
   onApplyCoupon,
   onBack,
   onShop,
@@ -59,10 +93,13 @@ export function CartScreen({
   const [coupon, setCoupon] = useState(couponCode);
   const [couponError, setCouponError] = useState(false);
   const couponApplied = !!couponCode;
-  const lines = cartProducts(cart);
-  const { subtotal, discount, shipping, total } = calculateTotals(
+  const lines = cartProducts(cart, catalogProducts);
+  const { subtotal, discount, shipping, total } = screenTotals(
     cart,
     couponCode,
+    catalogProducts,
+    liveCatalog,
+    totalsOverride,
   );
   const remainingForFreeShipping = Math.max(
     0,
@@ -103,86 +140,92 @@ export function CartScreen({
               />
             ))}
 
-            <View style={styles.shippingNotice}>
-              <View style={styles.shippingNoticeIcon}>
-                <Icon color={COLORS.teal} name="truck" size={19} />
-              </View>
-              <Text style={styles.shippingNoticeText}>
-                {remainingForFreeShipping > 0 ? (
-                  <>
-                    Mua thêm{' '}
+            {!liveCatalog ? (
+              <View style={styles.shippingNotice}>
+                <View style={styles.shippingNoticeIcon}>
+                  <Icon color={COLORS.teal} name="truck" size={19} />
+                </View>
+                <Text style={styles.shippingNoticeText}>
+                  {remainingForFreeShipping > 0 ? (
+                    <>
+                      Mua thêm{' '}
+                      <Text style={styles.shippingNoticeStrong}>
+                        {money(remainingForFreeShipping)}
+                      </Text>{' '}
+                      để được miễn phí vận chuyển.
+                    </>
+                  ) : (
                     <Text style={styles.shippingNoticeStrong}>
-                      {money(remainingForFreeShipping)}
-                    </Text>{' '}
-                    để được miễn phí vận chuyển.
-                  </>
-                ) : (
-                  <Text style={styles.shippingNoticeStrong}>
-                    Đơn hàng của bạn đã đủ điều kiện miễn phí vận chuyển.
-                  </Text>
-                )}
-              </Text>
-            </View>
+                      Đơn hàng của bạn đã đủ điều kiện miễn phí vận chuyển.
+                    </Text>
+                  )}
+                </Text>
+              </View>
+            ) : null}
 
-            <Text style={styles.cardHeading}>Bạn có mã ưu đãi?</Text>
-            <View style={styles.couponRow}>
-              <TextInput
-                testID="coupon-input"
-                accessibilityLabel="Mã ưu đãi"
-                autoCapitalize="characters"
-                onChangeText={value => {
-                  setCoupon(value);
-                  setCouponError(false);
-                }}
-                placeholder="Nhập SELLZY10"
-                placeholderTextColor="#98A1A6"
-                style={styles.couponInput}
-                value={coupon}
-              />
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Áp dụng mã ưu đãi"
-                onPress={() => setCouponError(!onApplyCoupon(coupon))}
-                style={styles.couponButton}
-              >
-                <Text style={styles.couponButtonText}>Áp dụng</Text>
-              </Pressable>
-            </View>
-            {couponError || couponApplied ? (
-              <Text
-                style={[
-                  styles.couponMessage,
-                  couponApplied && styles.couponSuccess,
-                ]}
-              >
-                {couponError
-                  ? 'Mã ưu đãi không hợp lệ. Hãy thử SELLZY10.'
-                  : `Đã áp dụng ${couponCode} — bạn tiết kiệm ${money(
+            {!liveCatalog ? (
+              <>
+                <Text style={styles.cardHeading}>Bạn có mã ưu đãi?</Text>
+                <View style={styles.couponRow}>
+                  <TextInput
+                    testID="coupon-input"
+                    accessibilityLabel="Mã ưu đãi"
+                    autoCapitalize="characters"
+                    onChangeText={value => {
+                      setCoupon(value);
+                      setCouponError(false);
+                    }}
+                    placeholder="Nhập SELLZY10"
+                    placeholderTextColor="#98A1A6"
+                    style={styles.couponInput}
+                    value={coupon}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Áp dụng mã ưu đãi"
+                    onPress={() => setCouponError(!onApplyCoupon(coupon))}
+                    style={styles.couponButton}
+                  >
+                    <Text style={styles.couponButtonText}>Áp dụng</Text>
+                  </Pressable>
+                </View>
+                {couponError ? (
+                  <Text style={[styles.couponMessage, styles.couponError]}>
+                    Mã ưu đãi không hợp lệ. Hãy thử SELLZY10.
+                  </Text>
+                ) : null}
+                {couponApplied ? (
+                  <Text style={[styles.couponMessage, styles.couponSuccess]}>
+                    {`Đã áp dụng ${couponCode} — bạn tiết kiệm ${money(
                       discount,
                     )}!`}
-              </Text>
-            ) : null}
-            {couponApplied ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => {
-                  onApplyCoupon('');
-                  setCoupon('');
-                  setCouponError(false);
-                }}
-              >
-                <Text style={styles.removeCoupon}>Xóa mã ưu đãi</Text>
-              </Pressable>
+                  </Text>
+                ) : null}
+                {couponApplied ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => {
+                      onApplyCoupon('');
+                      setCoupon('');
+                      setCouponError(false);
+                    }}
+                  >
+                    <Text style={styles.removeCoupon}>Xóa mã ưu đãi</Text>
+                  </Pressable>
+                ) : null}
+              </>
             ) : null}
 
             <View style={styles.summaryCard}>
               <Text style={styles.summaryTitle}>Tóm tắt đơn hàng</Text>
               <SummaryRow label="Tạm tính" value={money(subtotal)} />
-              <SummaryRow
-                label="Giảm giá"
-                positive
-                value={discount ? `−${money(discount)}` : money(0)}
-              />
+              {!liveCatalog || discount > 0 ? (
+                <SummaryRow
+                  label="Giảm giá"
+                  positive
+                  value={discount ? `−${money(discount)}` : money(0)}
+                />
+              ) : null}
               <SummaryRow
                 label="Vận chuyển"
                 positive={shipping === 0}
@@ -244,7 +287,7 @@ function CartLine({
         <Text numberOfLines={2} style={styles.cartName}>
           {product.name}
         </Text>
-        <Text style={styles.cartPrice}>{money(product.price)}</Text>
+        <Text style={styles.cartPrice}>{money(unitPrice(product, quantity))}</Text>
         <View style={styles.cartLineActions}>
           <View style={styles.miniQuantity}>
             <Pressable
@@ -324,6 +367,9 @@ type CheckoutProps = {
   topInset: number;
   cart: CartQuantities;
   couponCode: string;
+  catalogProducts?: Product[];
+  liveCatalog?: boolean;
+  totalsOverride?: DisplayTotals;
   initialDetails: CustomerDetails;
   onBack: () => void;
   onPlaceOrder: (details: CustomerDetails) => Promise<void>;
@@ -333,11 +379,17 @@ export function CheckoutScreen({
   topInset,
   cart,
   couponCode,
+  catalogProducts = products,
+  liveCatalog = false,
+  totalsOverride,
   initialDetails,
   onBack,
   onPlaceOrder,
 }: CheckoutProps) {
-  const [details, setDetails] = useState<CustomerDetails>(initialDetails);
+  const [details, setDetails] = useState<CustomerDetails>(() => ({
+    ...initialDetails,
+    payment: liveCatalog ? 'cash' : initialDetails.payment,
+  }));
   const [card, setCard] = useState<DemoCardDetails>({
     cardholder: '',
     number: '',
@@ -348,17 +400,27 @@ export function CheckoutScreen({
   const [deliveryAttempted, setDeliveryAttempted] = useState(false);
   const [paymentAttempted, setPaymentAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
-  const lines = cartProducts(cart);
-  const { subtotal, discount, shipping, total } = calculateTotals(
+  const lines = cartProducts(cart, catalogProducts);
+  const { subtotal, discount, shipping, total } = screenTotals(
     cart,
     couponCode,
+    catalogProducts,
+    liveCatalog,
+    totalsOverride,
   );
   const deliveryErrors = validateDelivery(details);
+  const districtError =
+    liveCatalog && (details.district ?? '').trim().length < 2
+      ? 'Vui lòng nhập quận/huyện.'
+      : undefined;
   const cardErrors = validateDemoCard(card);
-  const deliveryValid = Object.keys(deliveryErrors).length === 0;
+  const deliveryValid =
+    !districtError && Object.keys(deliveryErrors).length === 0;
   const paymentValid =
-    details.payment === 'cash' || Object.keys(cardErrors).length === 0;
+    details.payment === 'cash' ||
+    (!liveCatalog && Object.keys(cardErrors).length === 0);
 
   const update = (key: keyof CustomerDetails, value: string) =>
     setDetails(current => ({ ...current, [key]: value }));
@@ -397,360 +459,418 @@ export function CheckoutScreen({
         subtitle={`Bước ${step + 1}/3 · ${stepLabels[step]}`}
         title="Thanh toán"
       />
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={styles.checkoutContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.steps}>
-          {stepLabels.map((label, index) => (
-            <View key={label} style={styles.stepItem}>
-              <View
-                style={[
-                  styles.stepCircle,
-                  index <= step && styles.stepCircleActive,
-                ]}
-              >
-                {index < step ? (
-                  <Icon name="check" size={16} color={COLORS.white} />
-                ) : (
-                  <Text
-                    style={[
-                      styles.stepNumber,
-                      index <= step && styles.stepNumberActive,
-                    ]}
-                  >
-                    {index + 1}
-                  </Text>
-                )}
-              </View>
-              <Text
-                style={[
-                  styles.stepLabel,
-                  index <= step && styles.stepLabelActive,
-                ]}
-              >
-                {label}
-              </Text>
-            </View>
-          ))}
-        </View>
-
-        {step === 0 ? (
-          <>
-            <View style={styles.formCard}>
-              <Text style={styles.formTitle}>Thông tin giao hàng</Text>
-              <CheckoutField
-                error={deliveryAttempted ? deliveryErrors.fullName : undefined}
-                testID="checkout-name"
-                label="Họ và tên"
-                onChangeText={value => update('fullName', value)}
-                placeholder="Nhập họ và tên"
-                value={details.fullName}
-              />
-              <CheckoutField
-                error={deliveryAttempted ? deliveryErrors.phone : undefined}
-                testID="checkout-phone"
-                keyboardType="phone-pad"
-                label="Số điện thoại"
-                onChangeText={value => update('phone', value)}
-                placeholder="Nhập số điện thoại"
-                value={details.phone}
-              />
-              <CheckoutField
-                error={deliveryAttempted ? deliveryErrors.address : undefined}
-                testID="checkout-address"
-                label="Địa chỉ nhận hàng"
-                onChangeText={value => update('address', value)}
-                placeholder="Số nhà, tên đường"
-                value={details.address}
-              />
-              <CheckoutField
-                error={deliveryAttempted ? deliveryErrors.city : undefined}
-                testID="checkout-city"
-                label="Tỉnh / Thành phố"
-                onChangeText={value => update('city', value)}
-                placeholder="Nhập tỉnh hoặc thành phố"
-                value={details.city}
-              />
-              {deliveryAttempted && !deliveryValid ? (
-                <Text style={styles.formError}>
-                  Vui lòng điền đầy đủ và chính xác thông tin giao hàng.
-                </Text>
-              ) : null}
-            </View>
-            <CheckoutSummary
-              cart={cart}
-              couponCode={couponCode}
-              discount={discount}
-              lines={lines}
-              shipping={shipping}
-              subtotal={subtotal}
-              total={total}
-            />
-            <Pressable
-              accessibilityRole="button"
-              testID="checkout-continue-payment"
-              onPress={() => {
-                setDeliveryAttempted(true);
-                if (deliveryValid) changeStep(1);
-                else scrollRef.current?.scrollTo({ y: 0, animated: true });
-              }}
-              style={({ pressed }) => [
-                sharedStyles.primaryButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={sharedStyles.primaryButtonText}>
-                Tiếp tục thanh toán
-              </Text>
-            </Pressable>
-          </>
-        ) : null}
-
-        {step === 1 ? (
-          <>
-            <View style={styles.formCard}>
-              <Text style={styles.formTitle}>Phương thức thanh toán</Text>
-              <PaymentOption
-                active={details.payment === 'cash'}
-                icon="truck"
-                label="Thanh toán khi nhận hàng"
-                onPress={() => update('payment', 'cash')}
-                subtitle="Đơn được lưu ngay, thanh toán khi nhận hàng"
-              />
-              <PaymentOption
-                active={details.payment === 'card'}
-                icon="credit-card"
-                label="Thẻ tín dụng hoặc ghi nợ"
-                onPress={() => update('payment', 'card')}
-                subtitle="Biểu mẫu thẻ mẫu — không phát sinh thanh toán"
-              />
-              {details.payment === 'card' ? (
-                <>
-                  <View style={styles.demoNotice}>
-                    <Icon name="shield" color="#77601A" size={18} />
-                    <Text style={styles.demoNoticeText}>
-                      Đây là bản mẫu. Dùng số 4242 4242 4242 4242. Thông tin thẻ
-                      không bao giờ được lưu hoặc gửi đi.
+      {!lines.length ? (
+        <EmptyState
+          actionLabel="Quay lại giỏ hàng"
+          icon="▱"
+          message="Giỏ hàng của bạn không còn sản phẩm để đặt."
+          onAction={onBack}
+          title="Chưa có sản phẩm"
+        />
+      ) : (
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={styles.checkoutContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.steps}>
+            {stepLabels.map((label, index) => (
+              <View key={label} style={styles.stepItem}>
+                <View
+                  style={[
+                    styles.stepCircle,
+                    index <= step && styles.stepCircleActive,
+                  ]}
+                >
+                  {index < step ? (
+                    <Icon name="check" size={16} color={COLORS.white} />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.stepNumber,
+                        index <= step && styles.stepNumberActive,
+                      ]}
+                    >
+                      {index + 1}
                     </Text>
-                  </View>
-                  <CheckoutField
-                    autoCapitalize="words"
-                    autoComplete="off"
-                    error={paymentAttempted ? cardErrors.cardholder : undefined}
-                    testID="card-holder"
-                    label="Tên in trên thẻ"
-                    onChangeText={value => updateCard('cardholder', value)}
-                    placeholder="Tên chủ thẻ mẫu"
-                    value={card.cardholder}
-                  />
-                  <CheckoutField
-                    autoComplete="off"
-                    error={paymentAttempted ? cardErrors.number : undefined}
-                    testID="card-number"
-                    keyboardType="number-pad"
-                    label="Số thẻ"
-                    maxLength={19}
-                    onChangeText={value => {
-                      const digits = value.replace(/\D/g, '').slice(0, 16);
-                      updateCard(
-                        'number',
-                        digits.replace(/(\d{4})(?=\d)/g, '$1 '),
-                      );
-                    }}
-                    placeholder="4242 4242 4242 4242"
-                    value={card.number}
-                  />
-                  <View style={styles.cardRow}>
-                    <View style={styles.cardHalf}>
-                      <CheckoutField
-                        autoComplete="off"
-                        error={paymentAttempted ? cardErrors.expiry : undefined}
-                        testID="card-expiry"
-                        keyboardType="number-pad"
-                        label="Ngày hết hạn"
-                        maxLength={5}
-                        onChangeText={value => {
-                          const digits = value.replace(/\D/g, '').slice(0, 4);
-                          updateCard(
-                            'expiry',
-                            digits.length > 2
-                              ? `${digits.slice(0, 2)}/${digits.slice(2)}`
-                              : digits,
-                          );
-                        }}
-                        placeholder="MM/YY"
-                        value={card.expiry}
-                      />
-                    </View>
-                    <View style={styles.cardHalf}>
-                      <CheckoutField
-                        autoComplete="off"
-                        error={paymentAttempted ? cardErrors.cvv : undefined}
-                        testID="card-cvv"
-                        keyboardType="number-pad"
-                        label="CVV"
-                        maxLength={4}
-                        onChangeText={value =>
-                          updateCard(
-                            'cvv',
-                            value.replace(/\D/g, '').slice(0, 4),
-                          )
-                        }
-                        placeholder="123"
-                        secureTextEntry
-                        value={card.cvv}
-                      />
-                    </View>
-                  </View>
-                </>
-              ) : (
-                <View style={styles.demoNotice}>
-                  <Icon name="info" color="#77601A" size={18} />
-                  <Text style={styles.demoNoticeText}>
-                    Lựa chọn thanh toán khi nhận hàng chỉ được lưu cho bản mẫu.
-                    Không có người bán hoặc đơn vị vận chuyển nào nhận đơn này.
-                  </Text>
+                  )}
                 </View>
-              )}
-              {paymentAttempted && !paymentValid ? (
-                <Text style={styles.formError}>
-                  Vui lòng kiểm tra các trường thẻ mẫu đang được đánh dấu.
+                <Text
+                  style={[
+                    styles.stepLabel,
+                    index <= step && styles.stepLabelActive,
+                  ]}
+                >
+                  {label}
                 </Text>
-              ) : null}
-            </View>
-            <View style={styles.checkoutActions}>
-              <Pressable
-                accessibilityRole="button"
-                testID="checkout-back-delivery"
-                onPress={() => changeStep(0)}
-                style={[
-                  sharedStyles.secondaryButton,
-                  styles.checkoutActionButton,
-                ]}
-              >
-                <Text style={sharedStyles.secondaryButtonText}>Quay lại</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                testID="checkout-review-order"
-                onPress={() => {
-                  setPaymentAttempted(true);
-                  if (paymentValid) changeStep(2);
-                }}
-                style={[
-                  sharedStyles.primaryButton,
-                  styles.checkoutActionButton,
-                ]}
-              >
-                <Text style={sharedStyles.primaryButtonText}>
-                  Xem lại đơn hàng
-                </Text>
-              </Pressable>
-            </View>
-          </>
-        ) : null}
+              </View>
+            ))}
+          </View>
 
-        {step === 2 ? (
-          <>
-            <View style={styles.reviewCard}>
-              <View style={styles.reviewHeader}>
-                <Text style={styles.reviewTitle}>Giao hàng</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Sửa thông tin giao hàng"
-                  onPress={() => changeStep(0)}
-                  style={styles.editLink}
-                >
-                  <Text style={styles.editLinkText}>Sửa</Text>
-                </Pressable>
-              </View>
-              <Text style={styles.reviewStrong}>{details.fullName}</Text>
-              <Text style={styles.reviewText}>{details.phone}</Text>
-              <Text style={styles.reviewText}>
-                {details.address}, {details.city}
-              </Text>
-            </View>
-            <View style={styles.reviewCard}>
-              <View style={styles.reviewHeader}>
-                <Text style={styles.reviewTitle}>Thanh toán</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Sửa phương thức thanh toán"
-                  onPress={() => changeStep(1)}
-                  style={styles.editLink}
-                >
-                  <Text style={styles.editLinkText}>Sửa</Text>
-                </Pressable>
-              </View>
-              <Text style={styles.reviewStrong}>
-                {details.payment === 'cash'
-                  ? 'Thanh toán khi nhận hàng'
-                  : `Thẻ mẫu kết thúc bằng ${card.number
-                      .replace(/\D/g, '')
-                      .slice(-4)}`}
-              </Text>
-              <Text style={styles.reviewText}>
-                Bản mẫu trên thiết bị không thực hiện bất kỳ khoản thanh toán
-                nào.
-              </Text>
-            </View>
-            <CheckoutSummary
-              cart={cart}
-              couponCode={couponCode}
-              discount={discount}
-              lines={lines}
-              shipping={shipping}
-              subtotal={subtotal}
-              total={total}
-            />
-            <View style={styles.checkoutActions}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => changeStep(1)}
-                style={[
-                  sharedStyles.secondaryButton,
-                  styles.checkoutActionButton,
-                ]}
-              >
-                <Text style={sharedStyles.secondaryButtonText}>Quay lại</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                testID="place-order"
-                disabled={submitting || !lines.length}
-                accessibilityState={{
-                  disabled: submitting || !lines.length,
-                  busy: submitting,
-                }}
-                onPress={async () => {
-                  setSubmitting(true);
-                  try {
-                    await onPlaceOrder(details);
-                  } finally {
-                    setSubmitting(false);
+          {step === 0 ? (
+            <>
+              <View style={styles.formCard}>
+                <Text style={styles.formTitle}>Thông tin giao hàng</Text>
+                <CheckoutField
+                  error={
+                    deliveryAttempted ? deliveryErrors.fullName : undefined
                   }
+                  testID="checkout-name"
+                  label="Họ và tên"
+                  onChangeText={value => update('fullName', value)}
+                  placeholder="Nhập họ và tên"
+                  value={details.fullName}
+                />
+                <CheckoutField
+                  error={deliveryAttempted ? deliveryErrors.phone : undefined}
+                  testID="checkout-phone"
+                  keyboardType="phone-pad"
+                  label="Số điện thoại"
+                  onChangeText={value => update('phone', value)}
+                  placeholder="Nhập số điện thoại"
+                  value={details.phone}
+                />
+                <CheckoutField
+                  error={deliveryAttempted ? deliveryErrors.address : undefined}
+                  testID="checkout-address"
+                  label="Địa chỉ nhận hàng"
+                  onChangeText={value => update('address', value)}
+                  placeholder="Số nhà, tên đường"
+                  value={details.address}
+                />
+                {liveCatalog ? (
+                  <CheckoutField
+                    error={deliveryAttempted ? districtError : undefined}
+                    testID="checkout-district"
+                    label="Quận / Huyện"
+                    onChangeText={value => update('district', value)}
+                    placeholder="Nhập quận hoặc huyện"
+                    value={details.district ?? ''}
+                  />
+                ) : null}
+                <CheckoutField
+                  error={deliveryAttempted ? deliveryErrors.city : undefined}
+                  testID="checkout-city"
+                  label="Tỉnh / Thành phố"
+                  onChangeText={value => update('city', value)}
+                  placeholder="Nhập tỉnh hoặc thành phố"
+                  value={details.city}
+                />
+                {deliveryAttempted && !deliveryValid ? (
+                  <Text style={styles.formError}>
+                    Vui lòng điền đầy đủ và chính xác thông tin giao hàng.
+                  </Text>
+                ) : null}
+              </View>
+              <CheckoutSummary
+                cart={cart}
+                couponCode={liveCatalog ? '' : couponCode}
+                discount={discount}
+                lines={lines}
+                shipping={shipping}
+                subtotal={subtotal}
+                total={total}
+              />
+              <Pressable
+                accessibilityRole="button"
+                testID="checkout-continue-payment"
+                onPress={() => {
+                  setDeliveryAttempted(true);
+                  if (deliveryValid) changeStep(1);
+                  else scrollRef.current?.scrollTo({ y: 0, animated: true });
                 }}
                 style={({ pressed }) => [
                   sharedStyles.primaryButton,
-                  styles.checkoutActionButton,
                   pressed && styles.pressed,
                 ]}
               >
                 <Text style={sharedStyles.primaryButtonText}>
-                  {submitting ? 'Đang lưu đơn hàng…' : 'Đặt đơn mẫu'}
+                  Tiếp tục thanh toán
                 </Text>
               </Pressable>
-            </View>
-            <Text style={styles.secureText}>
-              Khi đặt đơn mẫu, bạn chỉ lưu tóm tắt đơn hàng trên thiết bị. Không
-              có thanh toán hoặc vận chuyển nào được khởi tạo.
-            </Text>
-          </>
-        ) : null}
-      </ScrollView>
+            </>
+          ) : null}
+
+          {step === 1 ? (
+            <>
+              <View style={styles.formCard}>
+                <Text style={styles.formTitle}>Phương thức thanh toán</Text>
+                <PaymentOption
+                  active={details.payment === 'cash'}
+                  icon="truck"
+                  label="Thanh toán khi nhận hàng"
+                  onPress={() => update('payment', 'cash')}
+                  subtitle={
+                    liveCatalog
+                      ? 'Thanh toán khi đơn hàng được giao'
+                      : 'Đơn được lưu ngay, thanh toán khi nhận hàng'
+                  }
+                />
+                {!liveCatalog ? (
+                  <PaymentOption
+                    active={details.payment === 'card'}
+                    icon="credit-card"
+                    label="Thẻ tín dụng hoặc ghi nợ"
+                    onPress={() => update('payment', 'card')}
+                    subtitle="Biểu mẫu thẻ mẫu — không phát sinh thanh toán"
+                  />
+                ) : null}
+                {!liveCatalog && details.payment === 'card' ? (
+                  <>
+                    <View style={styles.demoNotice}>
+                      <Icon name="shield" color="#77601A" size={18} />
+                      <Text style={styles.demoNoticeText}>
+                        Đây là bản mẫu. Dùng số 4242 4242 4242 4242. Thông tin
+                        thẻ không bao giờ được lưu hoặc gửi đi.
+                      </Text>
+                    </View>
+                    <CheckoutField
+                      autoCapitalize="words"
+                      autoComplete="off"
+                      error={
+                        paymentAttempted ? cardErrors.cardholder : undefined
+                      }
+                      testID="card-holder"
+                      label="Tên in trên thẻ"
+                      onChangeText={value => updateCard('cardholder', value)}
+                      placeholder="Tên chủ thẻ mẫu"
+                      value={card.cardholder}
+                    />
+                    <CheckoutField
+                      autoComplete="off"
+                      error={paymentAttempted ? cardErrors.number : undefined}
+                      testID="card-number"
+                      keyboardType="number-pad"
+                      label="Số thẻ"
+                      maxLength={19}
+                      onChangeText={value => {
+                        const digits = value.replace(/\D/g, '').slice(0, 16);
+                        updateCard(
+                          'number',
+                          digits.replace(/(\d{4})(?=\d)/g, '$1 '),
+                        );
+                      }}
+                      placeholder="4242 4242 4242 4242"
+                      value={card.number}
+                    />
+                    <View style={styles.cardRow}>
+                      <View style={styles.cardHalf}>
+                        <CheckoutField
+                          autoComplete="off"
+                          error={
+                            paymentAttempted ? cardErrors.expiry : undefined
+                          }
+                          testID="card-expiry"
+                          keyboardType="number-pad"
+                          label="Ngày hết hạn"
+                          maxLength={5}
+                          onChangeText={value => {
+                            const digits = value.replace(/\D/g, '').slice(0, 4);
+                            updateCard(
+                              'expiry',
+                              digits.length > 2
+                                ? `${digits.slice(0, 2)}/${digits.slice(2)}`
+                                : digits,
+                            );
+                          }}
+                          placeholder="MM/YY"
+                          value={card.expiry}
+                        />
+                      </View>
+                      <View style={styles.cardHalf}>
+                        <CheckoutField
+                          autoComplete="off"
+                          error={paymentAttempted ? cardErrors.cvv : undefined}
+                          testID="card-cvv"
+                          keyboardType="number-pad"
+                          label="CVV"
+                          maxLength={4}
+                          onChangeText={value =>
+                            updateCard(
+                              'cvv',
+                              value.replace(/\D/g, '').slice(0, 4),
+                            )
+                          }
+                          placeholder="123"
+                          secureTextEntry
+                          value={card.cvv}
+                        />
+                      </View>
+                    </View>
+                  </>
+                ) : !liveCatalog ? (
+                  <View style={styles.demoNotice}>
+                    <Icon name="info" color="#77601A" size={18} />
+                    <Text style={styles.demoNoticeText}>
+                      Lựa chọn thanh toán khi nhận hàng chỉ được lưu cho bản
+                      mẫu. Không có người bán hoặc đơn vị vận chuyển nào nhận
+                      đơn này.
+                    </Text>
+                  </View>
+                ) : null}
+                {paymentAttempted && !paymentValid ? (
+                  <Text style={styles.formError}>
+                    Vui lòng kiểm tra các trường thẻ mẫu đang được đánh dấu.
+                  </Text>
+                ) : null}
+              </View>
+              <View style={styles.checkoutActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  testID="checkout-back-delivery"
+                  onPress={() => changeStep(0)}
+                  style={[
+                    sharedStyles.secondaryButton,
+                    styles.checkoutActionButton,
+                  ]}
+                >
+                  <Text style={sharedStyles.secondaryButtonText}>Quay lại</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  testID="checkout-review-order"
+                  onPress={() => {
+                    setPaymentAttempted(true);
+                    if (paymentValid) changeStep(2);
+                  }}
+                  style={[
+                    sharedStyles.primaryButton,
+                    styles.checkoutActionButton,
+                  ]}
+                >
+                  <Text style={sharedStyles.primaryButtonText}>
+                    Xem lại đơn hàng
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          ) : null}
+
+          {step === 2 ? (
+            <>
+              <View style={styles.reviewCard}>
+                <View style={styles.reviewHeader}>
+                  <Text style={styles.reviewTitle}>Giao hàng</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Sửa thông tin giao hàng"
+                    onPress={() => changeStep(0)}
+                    style={styles.editLink}
+                  >
+                    <Text style={styles.editLinkText}>Sửa</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.reviewStrong}>{details.fullName}</Text>
+                <Text style={styles.reviewText}>{details.phone}</Text>
+                <Text style={styles.reviewText}>
+                  {[
+                    details.address,
+                    liveCatalog ? details.district : '',
+                    details.city,
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}
+                </Text>
+              </View>
+              <View style={styles.reviewCard}>
+                <View style={styles.reviewHeader}>
+                  <Text style={styles.reviewTitle}>Thanh toán</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Sửa phương thức thanh toán"
+                    onPress={() => changeStep(1)}
+                    style={styles.editLink}
+                  >
+                    <Text style={styles.editLinkText}>Sửa</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.reviewStrong}>
+                  {details.payment === 'cash'
+                    ? 'Thanh toán khi nhận hàng'
+                    : `Thẻ mẫu kết thúc bằng ${card.number
+                        .replace(/\D/g, '')
+                        .slice(-4)}`}
+                </Text>
+                {!liveCatalog ? (
+                  <Text style={styles.reviewText}>
+                    Bản mẫu trên thiết bị không thực hiện bất kỳ khoản thanh
+                    toán nào.
+                  </Text>
+                ) : null}
+              </View>
+              <CheckoutSummary
+                cart={cart}
+                couponCode={liveCatalog ? '' : couponCode}
+                discount={discount}
+                lines={lines}
+                shipping={shipping}
+                subtotal={subtotal}
+                total={total}
+              />
+              <View style={styles.checkoutActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => changeStep(1)}
+                  style={[
+                    sharedStyles.secondaryButton,
+                    styles.checkoutActionButton,
+                  ]}
+                >
+                  <Text style={sharedStyles.secondaryButtonText}>Quay lại</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  testID="place-order"
+                  disabled={submitting || !lines.length}
+                  accessibilityState={{
+                    disabled: submitting || !lines.length,
+                    busy: submitting,
+                  }}
+                  onPress={async () => {
+                    setSubmitting(true);
+                    setSubmitError('');
+                    try {
+                      await onPlaceOrder(details);
+                    } catch (error) {
+                      setSubmitError(
+                        error instanceof Error && error.message
+                          ? error.message
+                          : 'Chưa thể đặt hàng. Vui lòng thử lại.',
+                      );
+                    } finally {
+                      setSubmitting(false);
+                    }
+                  }}
+                  style={({ pressed }) => [
+                    sharedStyles.primaryButton,
+                    styles.checkoutActionButton,
+                    pressed && styles.pressed,
+                  ]}
+                >
+                  <Text style={sharedStyles.primaryButtonText}>
+                    {submitting
+                      ? 'Đang đặt hàng…'
+                      : liveCatalog
+                      ? 'Đặt hàng'
+                      : 'Đặt đơn mẫu'}
+                  </Text>
+                </Pressable>
+              </View>
+              {submitError ? (
+                <Text accessibilityLiveRegion="polite" style={styles.formError}>
+                  {submitError}
+                </Text>
+              ) : null}
+              <Text style={styles.secureText}>
+                {liveCatalog
+                  ? 'Đơn hàng sẽ được gửi đến cửa hàng để xử lý.'
+                  : 'Khi đặt đơn mẫu, bạn chỉ lưu tóm tắt đơn hàng trên thiết bị. Không có thanh toán hoặc vận chuyển nào được khởi tạo.'}
+              </Text>
+            </>
+          ) : null}
+        </ScrollView>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -781,7 +901,7 @@ function CheckoutSummary({
             {cart[product.id]} × {product.name}
           </Text>
           <Text style={styles.checkoutLinePrice}>
-            {money(product.price * cart[product.id])}
+            {money(unitPrice(product, cart[product.id]) * cart[product.id])}
           </Text>
         </View>
       ))}
@@ -872,11 +992,13 @@ export function OrderSuccessScreen({
   orderId,
   onOrders,
   onHome,
+  liveCatalog = false,
 }: {
   topInset: number;
   orderId: string;
   onOrders: () => void;
   onHome: () => void;
+  liveCatalog?: boolean;
 }) {
   return (
     <View
@@ -889,16 +1011,22 @@ export function OrderSuccessScreen({
       <View style={styles.successIconWrap}>
         <Icon name="check" color={COLORS.teal} size={55} />
       </View>
-      <Text style={styles.successTitle}>Đã lưu đơn hàng!</Text>
+      <Text style={styles.successTitle}>
+        {liveCatalog ? 'Đặt hàng thành công!' : 'Đã lưu đơn hàng!'}
+      </Text>
       <Text style={styles.successMessage}>
-        Đơn hàng mẫu đã sẵn sàng để xem lại trong mục Đơn hàng của tôi.
+        {liveCatalog
+          ? 'Đơn hàng đã được gửi đến cửa hàng. Bản tóm tắt được lưu trên thiết bị này; trạng thái giao hàng chưa được đồng bộ.'
+          : 'Đơn hàng mẫu đã sẵn sàng để xem lại trong mục Đơn hàng của tôi.'}
       </Text>
       <View style={styles.orderIdCard}>
         <Text style={styles.orderIdLabel}>MÃ ĐƠN HÀNG</Text>
         <Text style={styles.orderId}>{orderId}</Text>
-        <Text style={styles.orderEta}>
-          Đã lưu trên thiết bị · Không thanh toán hoặc vận chuyển
-        </Text>
+        {!liveCatalog ? (
+          <Text style={styles.orderEta}>
+            Đã lưu trên thiết bị · Không thanh toán hoặc vận chuyển
+          </Text>
+        ) : null}
       </View>
       <Pressable
         accessibilityRole="button"
@@ -1049,6 +1177,7 @@ const styles = StyleSheet.create({
   },
   couponButtonText: { color: COLORS.white, fontSize: 13, fontWeight: '900' },
   couponMessage: { color: COLORS.muted, fontSize: 12, marginTop: 7 },
+  couponError: { color: COLORS.red, fontWeight: '700' },
   couponSuccess: { color: COLORS.success, fontWeight: '800' },
   summaryCard: {
     marginTop: 18,

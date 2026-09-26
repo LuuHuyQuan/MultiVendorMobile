@@ -48,7 +48,7 @@ const buildApiUrl = (path: string): string => {
   return `${API_BASE_URL}/${path.replace(/^\/+/, '')}`;
 };
 
-const isAuthTokenResponse = (value: unknown): value is AuthTokenResponse => {
+export const isAuthTokenResponse = (value: unknown): value is AuthTokenResponse => {
   if (typeof value !== 'object' || value === null) {
     return false;
   }
@@ -57,12 +57,14 @@ const isAuthTokenResponse = (value: unknown): value is AuthTokenResponse => {
 
   return (
     typeof tokens.tokenType === 'string' &&
+    tokens.tokenType.length > 0 &&
     typeof tokens.accessToken === 'string' &&
     tokens.accessToken.length > 0 &&
     typeof tokens.refreshToken === 'string' &&
     tokens.refreshToken.length > 0 &&
     typeof tokens.expiresIn === 'number' &&
-    Number.isFinite(tokens.expiresIn)
+    Number.isFinite(tokens.expiresIn) &&
+    tokens.expiresIn > 0
   );
 };
 
@@ -112,7 +114,7 @@ const performTokenRefresh = async (): Promise<AuthTokenResponse> => {
       throw new ApiError(401, 'Phiên đăng nhập đã thay đổi.');
     }
 
-    await storeAuthTokens(payload);
+    await storeAuthTokens(payload, originalSession.email);
     return payload;
   } catch (error) {
     const currentSession = await getStoredSession();

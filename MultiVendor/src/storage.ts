@@ -7,11 +7,25 @@ import {
   emptyVendorDraft,
   VendorDraft,
 } from './accountTypes';
-import { normalizeCart, normalizeCoupon } from './commerce';
+import { isRemoteProductId, normalizeCart, normalizeCoupon } from './commerce';
 import { products } from './data/catalog';
-import type { CartQuantities, Order } from './types';
+import type { CartQuantities, Order, Product } from './types';
 
 export const STORAGE_KEY = '@sellzy/store/v1';
+export type StoreAccountScope = number | string;
+export const accountStorageKey = (scope: StoreAccountScope): string => {
+  if (typeof scope === 'string') {
+    const email = scope.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new Error('Email tài khoản không hợp lệ.');
+    }
+    return `${STORAGE_KEY}/email/${encodeURIComponent(email)}`;
+  }
+  if (!Number.isSafeInteger(scope) || scope < 1) {
+    throw new Error('Mã tài khoản không hợp lệ.');
+  }
+  return `${STORAGE_KEY}/account/${scope}`;
+};
 export type StoreData = {
   version: 1;
   cart: CartQuantities;
@@ -39,20 +53,24 @@ export function emptyStore(): StoreData {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
 
-export function restoreStore(raw: string | null): StoreData {
+export function restoreStore(
+  raw: string | null,
+  catalog: Product[] = products,
+): StoreData {
   if (raw === null) return emptyStore();
   const parsed: unknown = JSON.parse(raw);
   if (!isRecord(parsed) || parsed.version !== 1)
     throw new Error('Dữ liệu đã lưu không được hỗ trợ.');
   const result = emptyStore();
-  const ids = new Set(products.map(product => product.id));
-  result.cart = normalizeCart(parsed.cart);
+  const ids = new Set(catalog.map(product => product.id));
+  result.cart = normalizeCart(parsed.cart, catalog, true);
   result.coupon = normalizeCoupon(parsed.coupon);
   if (Array.isArray(parsed.wishlistIds)) {
     result.wishlistIds = [
       ...new Set(
         parsed.wishlistIds.filter(
-          (id): id is string => typeof id === 'string' && ids.has(id),
+          (id): id is string =>
+            typeof id === 'string' && (ids.has(id) || isRemoteProductId(id)),
         ),
       ),
     ];
@@ -98,7 +116,14 @@ export function restoreStore(raw: string | null): StoreData {
     );
   }
   if (isRecord(parsed.profile)) {
-    for (const key of ['name', 'email', 'phone', 'address', 'city'] as const) {
+    for (const key of [
+      'name',
+      'email',
+      'phone',
+      'address',
+      'district',
+      'city',
+    ] as const) {
       if (typeof parsed.profile[key] === 'string')
         result.profile[key] = parsed.profile[key].slice(0, 500);
     }
@@ -133,17 +158,28 @@ export function restoreStore(raw: string | null): StoreData {
   return result;
 }
 
-export async function loadStore() {
-  return restoreStore(await AsyncStorage.getItem(STORAGE_KEY));
+export async function loadStore(
+  catalog: Product[] = products,
+  accountScope?: StoreAccountScope,
+) {
+  await writeQueue.catch(() => undefined);
+  const key =
+    accountScope === undefined ? STORAGE_KEY : accountStorageKey(accountScope);
+  return restoreStore(await AsyncStorage.getItem(key), catalog);
 }
 
 // Writes are serialized: a slower earlier write cannot overwrite a newer cart.
 let writeQueue: Promise<unknown> = Promise.resolve();
-export function saveStore(data: StoreData): Promise<void> {
+export function saveStore(
+  data: StoreData,
+  accountScope?: StoreAccountScope,
+): Promise<void> {
+  const key =
+    accountScope === undefined ? STORAGE_KEY : accountStorageKey(accountScope);
   const snapshot = JSON.stringify(data);
   const next = writeQueue
     .catch(() => undefined)
-    .then(() => AsyncStorage.setItem(STORAGE_KEY, snapshot));
+    .then(() => AsyncStorage.setItem(key, snapshot));
   writeQueue = next;
   return next;
 }

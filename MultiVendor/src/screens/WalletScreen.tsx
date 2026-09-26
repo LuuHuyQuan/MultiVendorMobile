@@ -7,7 +7,6 @@ import React, {
 } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -24,6 +23,7 @@ import { Icon } from '../components/Icon';
 import { ScreenHeader } from '../components/SellzyUI';
 import { COLORS } from '../theme';
 import walletApi from '../walletApi';
+import { AccountDialog, AccountNotice } from './AccountForms';
 import type {
   LinkedBankAccount,
   LinkBankRequest,
@@ -246,9 +246,13 @@ export default function WalletScreen({
     signature: string;
     key: string;
   } | null>(null);
+  const moneyInFlightRef = useRef(false);
+  const bankMutationRef = useRef(false);
 
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [banks, setBanks] = useState<LinkedBankAccount[]>([]);
+  const [banksLoaded, setBanksLoaded] = useState(false);
+  const [banksError, setBanksError] = useState('');
   const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(true);
@@ -268,6 +272,8 @@ export default function WalletScreen({
   const [bankFormError, setBankFormError] = useState('');
   const [bankSubmitting, setBankSubmitting] = useState(false);
   const [busyBankId, setBusyBankId] = useState<number | null>(null);
+  const [pendingUnlinkBank, setPendingUnlinkBank] =
+    useState<LinkedBankAccount | null>(null);
 
   const reportRequestError = useCallback(
     (error: unknown, fallback: string) => {
@@ -294,6 +300,7 @@ export default function WalletScreen({
         setRefreshing(true);
       }
       setCoreError('');
+      setBanksError('');
       setHistoryError('');
 
       const [walletResult, bankResult, historyResult] =
@@ -315,13 +322,14 @@ export default function WalletScreen({
 
         if (bankResult.status === 'fulfilled') {
           setBanks(sortBanks(bankResult.value));
+          setBanksLoaded(true);
         } else {
-          coreErrors.push(
-            reportRequestError(
-              bankResult.reason,
-              'Không thể tải ngân hàng liên kết.',
-            ),
+          const message = reportRequestError(
+            bankResult.reason,
+            'Không thể tải ngân hàng liên kết.',
           );
+          setBanksError(message);
+          coreErrors.push(message);
         }
 
         if (historyResult.status === 'fulfilled') {
@@ -386,6 +394,7 @@ export default function WalletScreen({
   };
 
   const handleMoneySubmit = async () => {
+    if (moneyInFlightRef.current) return;
     clearActionMessages();
     const normalizedAmount = amount.trim().replace(',', '.');
     const value = Number(normalizedAmount);
@@ -405,6 +414,10 @@ export default function WalletScreen({
       setActionError('Ví hiện không hoạt động nên chưa thể tạo giao dịch.');
       return;
     }
+    if (moneyMode === 'withdrawal' && value > wallet.availableBalance) {
+      setActionError('Số tiền rút vượt quá số dư khả dụng trong ví.');
+      return;
+    }
     if (!selectedBank) {
       setActionError('Vui lòng liên kết và chọn một tài khoản ngân hàng.');
       return;
@@ -420,6 +433,7 @@ export default function WalletScreen({
         ? pendingMoneyRequestRef.current.key
         : makeIdempotencyKey();
     pendingMoneyRequestRef.current = { signature, key };
+    moneyInFlightRef.current = true;
     setMoneySubmitting(true);
     try {
       const request = {
@@ -444,10 +458,24 @@ export default function WalletScreen({
       );
       await loadAll('silent');
     } catch (error: unknown) {
+      const status = getErrorStatus(error);
+      // Keep the key after an uncertain failure so a retry cannot create a
+      // second transfer. A definite rejection may be submitted again later.
+      if (
+        status &&
+        status >= 400 &&
+        status < 500 &&
+        status !== 408 &&
+        status !== 409 &&
+        status !== 429
+      ) {
+        pendingMoneyRequestRef.current = null;
+      }
       setActionError(
         reportRequestError(error, 'Không thể tạo yêu cầu. Vui lòng thử lại.'),
       );
     } finally {
+      moneyInFlightRef.current = false;
       if (mountedRef.current) setMoneySubmitting(false);
     }
   };
@@ -484,10 +512,12 @@ export default function WalletScreen({
   };
 
   const handleLinkBank = async () => {
+    if (!banksLoaded || bankMutationRef.current) return;
     setBankFormError('');
     clearActionMessages();
     const request = validateBankDraft();
     if (!request) return;
+    bankMutationRef.current = true;
     setBankSubmitting(true);
     try {
       const linked = await walletApi.linkBank(request);
@@ -515,11 +545,14 @@ export default function WalletScreen({
         ),
       );
     } finally {
+      bankMutationRef.current = false;
       if (mountedRef.current) setBankSubmitting(false);
     }
   };
 
   const handleSetDefault = async (bank: LinkedBankAccount) => {
+    if (bankMutationRef.current) return;
+    bankMutationRef.current = true;
     clearActionMessages();
     setBusyBankId(bank.id);
     try {
@@ -540,11 +573,14 @@ export default function WalletScreen({
         reportRequestError(error, 'Không thể đổi ngân hàng mặc định.'),
       );
     } finally {
+      bankMutationRef.current = false;
       if (mountedRef.current) setBusyBankId(null);
     }
   };
 
   const unlinkBank = async (bank: LinkedBankAccount) => {
+    if (bankMutationRef.current) return;
+    bankMutationRef.current = true;
     clearActionMessages();
     setBusyBankId(bank.id);
     try {
@@ -558,23 +594,13 @@ export default function WalletScreen({
         reportRequestError(error, 'Không thể hủy liên kết ngân hàng.'),
       );
     } finally {
+      bankMutationRef.current = false;
       if (mountedRef.current) setBusyBankId(null);
     }
   };
 
   const confirmUnlinkBank = (bank: LinkedBankAccount) => {
-    Alert.alert(
-      'Hủy liên kết ngân hàng?',
-      `${bank.bankName} · ${bank.accountNumberMasked} sẽ bị xóa khỏi ví của bạn.`,
-      [
-        { text: 'Giữ lại', style: 'cancel' },
-        {
-          text: 'Hủy liên kết',
-          style: 'destructive',
-          onPress: () => runAsync(unlinkBank(bank)),
-        },
-      ],
-    );
+    setPendingUnlinkBank(bank);
   };
 
   const retryHistory = async () => {
@@ -668,6 +694,7 @@ export default function WalletScreen({
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
                 key={mode}
+                testID={`wallet-mode-${mode}`}
                 onPress={() => handleMoneyModeChange(mode)}
                 style={({ pressed }) => [
                   styles.segment,
@@ -695,6 +722,7 @@ export default function WalletScreen({
 
         <FormField
           label="Số tiền (VND)"
+          testID="wallet-amount"
           onChangeText={value => {
             setAmount(value.replace(/[^0-9.,]/g, ''));
             setActionError('');
@@ -775,6 +803,12 @@ export default function WalletScreen({
               );
             })}
           </View>
+        ) : !banksLoaded ? (
+          <View style={styles.noBankBox}>
+            <Text style={styles.noBankText}>
+              Chưa tải được ngân hàng liên kết. Hãy làm mới ví rồi thử lại.
+            </Text>
+          </View>
         ) : (
           <View style={styles.noBankBox}>
             <Text style={styles.noBankText}>
@@ -798,13 +832,13 @@ export default function WalletScreen({
           accessibilityRole="button"
           accessibilityState={{
             disabled:
-              moneySubmitting || walletInactive || banks.length === 0,
+              moneySubmitting || walletInactive || !banksLoaded || banks.length === 0,
           }}
-          disabled={moneySubmitting || walletInactive || banks.length === 0}
+          disabled={moneySubmitting || walletInactive || !banksLoaded || banks.length === 0}
           onPress={() => runAsync(handleMoneySubmit())}
           style={({ pressed }) => [
             styles.primaryButton,
-            (moneySubmitting || walletInactive || banks.length === 0) &&
+            (moneySubmitting || walletInactive || !banksLoaded || banks.length === 0) &&
               styles.buttonDisabled,
             pressed && styles.pressed,
           ]}
@@ -978,7 +1012,25 @@ export default function WalletScreen({
         title="Ngân hàng liên kết"
         subtitle={`${banks.length} tài khoản đang liên kết`}
       />
-      {banks.length === 0 ? (
+      {!banksLoaded && banksError ? (
+        <View style={styles.inlineState}>
+          <View style={styles.inlineStateIconError}>
+            <Icon name="info" color={COLORS.red} size={25} />
+          </View>
+          <Text style={styles.inlineStateTitle}>Chưa tải được ngân hàng</Text>
+          <Text style={styles.inlineStateText}>{banksError}</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => runAsync(loadAll('refresh'))}
+            style={({ pressed }) => [styles.outlineButton, pressed && styles.pressed]}
+          >
+            <Icon name="refresh" color={COLORS.teal} size={17} />
+            <Text style={styles.outlineButtonText}>Thử lại</Text>
+          </Pressable>
+        </View>
+      ) : !banksLoaded ? (
+        <LoadingCard label="Đang tải ngân hàng liên kết..." />
+      ) : banks.length === 0 ? (
         <View style={styles.compactEmptyState}>
           <Icon name="credit-card" color={COLORS.teal} size={27} />
           <Text style={styles.compactEmptyTitle}>Chưa có ngân hàng</Text>
@@ -1036,7 +1088,7 @@ export default function WalletScreen({
                   {!bank.isDefault ? (
                     <Pressable
                       accessibilityRole="button"
-                      disabled={busyBankId !== null}
+                      disabled={busyBankId !== null || bankSubmitting}
                       onPress={() => runAsync(handleSetDefault(bank))}
                       style={({ pressed }) => [
                         styles.bankAction,
@@ -1050,8 +1102,9 @@ export default function WalletScreen({
                   ) : null}
                   <Pressable
                     accessibilityRole="button"
-                    disabled={busyBankId !== null}
+                    disabled={busyBankId !== null || bankSubmitting}
                     onPress={() => confirmUnlinkBank(bank)}
+                    testID={`wallet-unlink-${bank.id}`}
                     style={({ pressed }) => [
                       styles.bankAction,
                       pressed && styles.pressed,
@@ -1074,13 +1127,19 @@ export default function WalletScreen({
     <View style={styles.card}>
       <Pressable
         accessibilityRole="button"
-        accessibilityState={{ expanded: showBankForm }}
+        accessibilityState={{
+          expanded: showBankForm,
+          disabled: !banksLoaded || bankSubmitting,
+        }}
+        disabled={!banksLoaded || bankSubmitting}
+        testID="wallet-add-bank-toggle"
         onPress={() => {
           setShowBankForm(current => !current);
           setBankFormError('');
         }}
         style={({ pressed }) => [
           styles.addBankToggle,
+          (!banksLoaded || bankSubmitting) && styles.buttonDisabled,
           pressed && styles.pressed,
         ]}
       >
@@ -1146,12 +1205,12 @@ export default function WalletScreen({
           ) : null}
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ disabled: bankSubmitting }}
-            disabled={bankSubmitting}
+            accessibilityState={{ disabled: bankSubmitting || busyBankId !== null }}
+            disabled={bankSubmitting || busyBankId !== null}
             onPress={() => runAsync(handleLinkBank())}
             style={({ pressed }) => [
               styles.outlineSubmitButton,
-              bankSubmitting && styles.buttonDisabled,
+              (bankSubmitting || busyBankId !== null) && styles.buttonDisabled,
               pressed && styles.pressed,
             ]}
             testID="wallet-link-bank"
@@ -1298,6 +1357,42 @@ export default function WalletScreen({
           </>
         )}
       </ScrollView>
+      {pendingUnlinkBank ? (
+        <AccountDialog
+          onClose={() => setPendingUnlinkBank(null)}
+          title="Hủy liên kết ngân hàng?"
+        >
+          <AccountNotice>
+            {pendingUnlinkBank.bankName} · {pendingUnlinkBank.accountNumberMasked}
+            {' sẽ bị xóa khỏi ví của bạn.'}
+          </AccountNotice>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              const bank = pendingUnlinkBank;
+              setPendingUnlinkBank(null);
+              runAsync(unlinkBank(bank));
+            }}
+            style={({ pressed }) => [
+              styles.unlinkConfirmButton,
+              pressed && styles.pressed,
+            ]}
+            testID="wallet-unlink-confirm"
+          >
+            <Text style={styles.unlinkConfirmText}>Hủy liên kết</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setPendingUnlinkBank(null)}
+            style={({ pressed }) => [
+              styles.outlineButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.outlineButtonText}>Giữ lại</Text>
+          </Pressable>
+        </AccountDialog>
+      ) : null}
     </View>
   );
 }
@@ -1779,6 +1874,14 @@ const styles = StyleSheet.create({
   bankAction: { minHeight: 44, paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center' },
   bankActionText: { color: COLORS.teal, fontSize: 12, fontWeight: '900' },
   bankActionDanger: { color: COLORS.red, fontSize: 12, fontWeight: '900' },
+  unlinkConfirmButton: {
+    minHeight: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.red,
+  },
+  unlinkConfirmText: { color: COLORS.white, fontSize: 14, fontWeight: '900' },
   addBankToggle: { minHeight: 48, flexDirection: 'row', alignItems: 'center' },
   addBankToggleIcon: {
     width: 38,

@@ -14,6 +14,16 @@ export type Product = {
   stock: number;
   description: string;
   benefits: string[];
+  /** Present for products loaded from the storefront API. */
+  variantId?: number;
+  priceTiers?: { minQuantity: number; price: number }[];
+  variants?: {
+    id: number;
+    name: string;
+    price: number;
+    stock: number;
+    priceTiers?: { minQuantity: number; price: number }[];
+  }[];
 };
 
 export type CartQuantities = Record<string, number>;
@@ -50,6 +60,7 @@ export type CustomerDetails = {
   phone: string;
   address: string;
   city: string;
+  district?: string;
   payment: 'cash' | 'card';
 };
 
@@ -72,6 +83,7 @@ export type RouteName =
   | 'account'
   | 'auth'
   | 'wallet'
+  | 'sellerPortal'
   | 'sellers'
   | 'help';
 
@@ -84,5 +96,5 @@ export type Route = {
   sort?: SortMode;
   key?: string;
   orderId?: string;
-  returnTo?: 'account' | 'wallet';
+  returnTo?: 'account' | 'wallet' | 'checkout';
 };

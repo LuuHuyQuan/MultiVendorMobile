@@ -4,22 +4,22 @@
 
 ## Tính năng
 
-- Trang chủ, danh mục sản phẩm, tìm kiếm, lọc và sắp xếp.
-- Chi tiết sản phẩm, sản phẩm yêu thích và giỏ hàng có kiểm tra tồn kho.
-- Mã ưu đãi `SELLZY10` giảm 10% giá trị sản phẩm.
-- Checkout 3 bước (giao hàng, thanh toán, kiểm tra đơn), có form thẻ demo không lưu dữ liệu thẻ; lưu đơn hàng cục bộ và hỗ trợ thêm lại sản phẩm từ đơn cũ.
-- Đăng ký, đăng nhập/đăng xuất tùy chọn qua API; access token được tự làm mới và người dùng vẫn có thể mua hàng ngay ở chế độ khách.
+- Tải danh mục, danh mục con, cửa hàng, chi tiết sản phẩm, biến thể, giá theo số lượng và tồn kho từ API storefront. Có tìm kiếm, lọc và sắp xếp.
+- Sản phẩm yêu thích và giỏ hàng lưu trên thiết bị; giỏ được đối chiếu với back-end trước khi đặt hàng.
+- Đặt đơn COD qua API sau khi đăng nhập. Ứng dụng xác nhận lại giá và tồn kho, lưu mã đơn cùng tóm tắt trên thiết bị và hỗ trợ mua lại.
+- Đăng ký, đăng nhập/đăng xuất qua API; access token được tự làm mới. Dữ liệu mua sắm được lưu riêng cho khách và từng email đăng nhập trên thiết bị.
 - Ví cá nhân đồng bộ với back-end: số dư khả dụng/tạm giữ, liên kết tài khoản ngân hàng, nạp tiền, rút tiền và lịch sử giao dịch.
 - Hồ sơ khách hàng, danh sách nhà bán và bản nháp đăng ký nhà bán.
-- Dữ liệu giỏ hàng, yêu thích, hồ sơ, đơn hàng và bản nháp được lưu bằng AsyncStorage.
+- Kênh người bán cho tài khoản có cửa hàng đang hoạt động: tổng quan, gửi sản phẩm chờ duyệt, gửi lại sản phẩm bị từ chối và cập nhật tiến trình đơn hàng theo quyền API.
+- Khi không kết nối được back-end, ứng dụng hiển thị danh mục mẫu trên thiết bị, mã `SELLZY10`, thanh toán mô phỏng và đơn hàng mẫu. Chế độ này được đánh dấu rõ trong ứng dụng.
 
 ## Phạm vi bản demo
 
-Danh mục, giỏ hàng và checkout hiện vẫn là dữ liệu demo cục bộ. Xác thực và ví cá nhân dùng API của dự án `MultiVendorEcommercePlatform`; mật khẩu không được lưu trên thiết bị. Thao tác **Place Demo Order** chỉ lưu đơn trên thiết bị, không thu tiền và không tạo vận đơn. Các yêu cầu nạp/rút tiền được gửi tới back-end và tuân theo trạng thái xử lý của hệ thống.
+Ứng dụng dùng API của dự án `MultiVendorEcommercePlatform` cho danh mục, xác thực, COD, ví và kênh người bán; mật khẩu không được lưu trên thiết bị. Back-end hiện chưa có API lịch sử đơn dành cho khách, vì vậy danh sách đơn thật trong ứng dụng là bản tóm tắt lưu trên thiết bị và trạng thái không tự đồng bộ. Back-end cũng chưa có API để khách gửi hồ sơ đăng ký cửa hàng; biểu mẫu này chỉ lưu bản nháp. Chỉ đơn COD được gửi đến back-end; thanh toán thẻ và `SELLZY10` chỉ có trong chế độ mẫu. Phần admin không nằm trong ứng dụng này.
 
 ## Yêu cầu phát triển
 
-- Node.js `>= 22.11.0` và npm.
+- Node.js `>= 22.13.0` và npm.
 - JDK 17.
 - Android Studio cùng Android SDK để chạy Android.
 - macOS cùng Xcode và CocoaPods để chạy iOS.
@@ -65,14 +65,6 @@ Nếu không tạo `.env`, ứng dụng tự dùng HTTPS localhost cho web và �
 
 Để biên dịch bằng Expo CLI nhưng vẫn dùng trực tiếp thư mục `android`/`ios`, dùng
 `npm run android:expo` hoặc `npm run ios:expo`.
-
-## Kiểm tra
-
-```powershell
-npm test -- --runInBand
-npm run lint
-npx tsc --noEmit
-```
 
 ## Tạo APK Android
 

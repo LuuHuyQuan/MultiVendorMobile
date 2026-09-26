@@ -29,14 +29,25 @@ const sorts: { id: SortMode; label: string }[] = [
   { id: 'discount', label: 'Giảm giá nhiều nhất' },
 ];
 
+type CategoryOption = { id: string; label: string };
+
+const searchable = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLocaleLowerCase('vi-VN');
+
 type CommonProps = {
   topInset: number;
   cartCount: number;
   wishlistIds: string[];
+  catalogProducts?: Product[];
   onBack: () => void;
   onCart: () => void;
   onOpenProduct: (id: string) => void;
-  onAdd: (id: string, quantity?: number) => void;
+  onAdd: (id: string, quantity?: number, variantId?: number) => void;
   onToggleLike: (id: string) => void;
 };
 
@@ -45,6 +56,7 @@ type ShopProps = CommonProps & {
   initialQuery?: string;
   initialStore?: string;
   initialSort?: SortMode;
+  catalogCategories?: CategoryOption[];
   canGoBack?: boolean;
   onFiltersChange?: (filters: {
     category: string;
@@ -57,6 +69,8 @@ export function ShopScreen({
   topInset,
   cartCount,
   wishlistIds,
+  catalogProducts = products,
+  catalogCategories = categories,
   initialCategory,
   initialQuery,
   initialStore,
@@ -88,15 +102,18 @@ export function ShopScreen({
   };
 
   const visibleProducts = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    const filtered = products.filter(product => {
+    const normalized = searchable(query.trim());
+    const filtered = catalogProducts.filter(product => {
       const matchesCategory =
         category === 'All' || product.category === category;
       const matchesQuery =
         !normalized ||
-        `${product.name} ${product.store} ${product.category}`
-          .toLowerCase()
-          .includes(normalized);
+        searchable(
+          `${product.name} ${product.store} ${product.category} ${
+            catalogCategories.find(item => item.id === product.category)
+              ?.label ?? ''
+          }`,
+        ).includes(normalized);
       return (
         matchesCategory &&
         matchesQuery &&
@@ -110,9 +127,16 @@ export function ShopScreen({
       if (sortMode === 'discount') return b.discount - a.discount;
       return b.rating - a.rating;
     });
-  }, [category, query, sortMode, initialStore]);
+  }, [
+    catalogCategories,
+    catalogProducts,
+    category,
+    query,
+    sortMode,
+    initialStore,
+  ]);
   const categoryLabel =
-    categories.find(item => item.id === category)?.label ?? category;
+    catalogCategories.find(item => item.id === category)?.label ?? category;
 
   return (
     <View style={[sharedStyles.screen, { paddingTop: topInset }]}>
@@ -135,7 +159,7 @@ export function ShopScreen({
         horizontal
         showsHorizontalScrollIndicator={false}
       >
-        {categories.map(item => {
+        {catalogCategories.map(item => {
           const active = item.id === category;
           return (
             <Pressable
@@ -250,7 +274,7 @@ export function ShopScreen({
 
 type DetailsProps = CommonProps & {
   product: Product;
-  onBuyNow: () => void;
+  onBuyNow: (id: string, quantity: number, variantId?: number) => void;
 };
 
 export function ProductDetailsScreen({
@@ -258,6 +282,7 @@ export function ProductDetailsScreen({
   topInset,
   cartCount,
   wishlistIds,
+  catalogProducts = products,
   onBack,
   onCart,
   onAdd,
@@ -266,8 +291,23 @@ export function ProductDetailsScreen({
   onBuyNow,
 }: DetailsProps) {
   const [quantity, setQuantity] = useState(1);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(
+    null,
+  );
+  const variants = product.variants ?? [];
+  const selectedVariant =
+    variants.find(item => item.id === selectedVariantId) ??
+    variants.find(item => item.stock > 0) ??
+    variants[0];
+  const currentStock = selectedVariant?.stock ?? product.stock;
+  const basePrice = selectedVariant?.price ?? product.price;
+  const currentPrice =
+    (selectedVariant?.priceTiers ?? product.priceTiers)
+      ?.filter(tier => tier.minQuantity <= quantity)
+      .sort((a, b) => b.minQuantity - a.minQuantity)[0]?.price ?? basePrice;
+  const isAvailable = currentStock > 0;
   const liked = wishlistIds.includes(product.id);
-  const related = products
+  const related = catalogProducts
     .filter(
       item => item.id !== product.id && item.category === product.category,
     )
@@ -293,11 +333,15 @@ export function ProductDetailsScreen({
             resizeMode="contain"
             style={styles.detailsImage}
           />
-          <View style={styles.detailsDiscount}>
-            <Text style={styles.detailsDiscountText}>
-              GIẢM {product.discount}%
-            </Text>
-          </View>
+          {product.discount > 0 &&
+          product.oldPrice > product.price &&
+          !selectedVariant ? (
+            <View style={styles.detailsDiscount}>
+              <Text style={styles.detailsDiscountText}>
+                GIẢM {product.discount}%
+              </Text>
+            </View>
+          ) : null}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
@@ -325,14 +369,71 @@ export function ProductDetailsScreen({
             </Text>
           </View>
           <View style={styles.detailsPriceRow}>
-            <Text style={styles.detailsPrice}>{money(product.price)}</Text>
-            <Text style={styles.detailsOldPrice}>
-              {money(product.oldPrice)}
-            </Text>
-            <View style={styles.stockBadge}>
-              <Text style={styles.stockText}>Còn {product.stock} sản phẩm</Text>
+            <Text style={styles.detailsPrice}>{money(currentPrice)}</Text>
+            {!selectedVariant && product.oldPrice > product.price ? (
+              <Text style={styles.detailsOldPrice}>
+                {money(product.oldPrice)}
+              </Text>
+            ) : null}
+            <View
+              style={[
+                styles.stockBadge,
+                !isAvailable && styles.stockBadgeEmpty,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.stockText,
+                  !isAvailable && styles.stockTextEmpty,
+                ]}
+              >
+                {isAvailable ? `Còn ${currentStock} sản phẩm` : 'Hết hàng'}
+              </Text>
             </View>
           </View>
+
+          {variants.length ? (
+            <View style={styles.variantSection}>
+              <Text style={styles.variantTitle}>Phân loại sản phẩm</Text>
+              <View style={styles.variantList}>
+                {variants.map(variant => {
+                  const active = selectedVariant?.id === variant.id;
+                  return (
+                    <Pressable
+                      key={variant.id}
+                      accessibilityRole="radio"
+                      accessibilityLabel={`${variant.name}, ${money(
+                        variant.price,
+                      )}${variant.stock ? '' : ', hết hàng'}`}
+                      accessibilityState={{
+                        checked: active,
+                        disabled: variant.stock <= 0,
+                      }}
+                      disabled={variant.stock <= 0}
+                      onPress={() => {
+                        setSelectedVariantId(variant.id);
+                        setQuantity(1);
+                      }}
+                      style={[
+                        styles.variantChip,
+                        active && styles.variantChipActive,
+                        variant.stock <= 0 && styles.variantChipDisabled,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.variantChipText,
+                          active && styles.variantChipTextActive,
+                        ]}
+                      >
+                        {variant.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          ) : null}
 
           <View style={styles.divider} />
           <Text style={styles.detailsSectionTitle}>Thông tin sản phẩm</Text>
@@ -367,9 +468,9 @@ export function ProductDetailsScreen({
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Tăng số lượng"
-                disabled={quantity >= product.stock}
+                disabled={!isAvailable || quantity >= currentStock}
                 onPress={() =>
-                  setQuantity(value => Math.min(product.stock, value + 1))
+                  setQuantity(value => Math.min(currentStock, value + 1))
                 }
                 style={styles.quantityButton}
               >
@@ -379,19 +480,24 @@ export function ProductDetailsScreen({
             <Pressable
               accessibilityRole="button"
               testID="details-add"
-              onPress={() => onAdd(product.id, quantity)}
-              style={styles.addLarge}
+              disabled={!isAvailable}
+              accessibilityState={{ disabled: !isAvailable }}
+              onPress={() => onAdd(product.id, quantity, selectedVariant?.id)}
+              style={[styles.addLarge, !isAvailable && styles.purchaseDisabled]}
             >
-              <Text style={styles.addLargeText}>Thêm vào giỏ</Text>
+              <Text style={styles.addLargeText}>
+                {isAvailable ? 'Thêm vào giỏ' : 'Hết hàng'}
+              </Text>
             </Pressable>
           </View>
           <Pressable
             accessibilityRole="button"
+            disabled={!isAvailable}
+            accessibilityState={{ disabled: !isAvailable }}
             onPress={() => {
-              onAdd(product.id, quantity);
-              onBuyNow();
+              onBuyNow(product.id, quantity, selectedVariant?.id);
             }}
-            style={styles.buyNow}
+            style={[styles.buyNow, !isAvailable && styles.purchaseDisabled]}
           >
             <Text style={styles.buyNowText}>Mua ngay →</Text>
           </Pressable>
@@ -554,6 +660,7 @@ const styles = StyleSheet.create({
   detailsPriceRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     marginTop: 16,
     gap: 10,
   },
@@ -571,6 +678,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#E8F7EE',
   },
   stockText: { color: COLORS.success, fontSize: 11, fontWeight: '900' },
+  stockBadgeEmpty: { backgroundColor: '#FDE9ED' },
+  stockTextEmpty: { color: COLORS.red },
+  variantSection: { marginTop: 20 },
+  variantTitle: { color: COLORS.ink, fontSize: 14, fontWeight: '900' },
+  variantList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  variantChip: {
+    minHeight: 42,
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+  },
+  variantChipActive: {
+    borderColor: COLORS.teal,
+    backgroundColor: COLORS.tealSoft,
+  },
+  variantChipDisabled: { opacity: 0.45 },
+  variantChipText: { color: COLORS.ink, fontSize: 12, fontWeight: '700' },
+  variantChipTextActive: { color: COLORS.teal, fontWeight: '900' },
+  purchaseDisabled: { opacity: 0.5 },
   divider: { height: 1, backgroundColor: COLORS.border, marginVertical: 22 },
   detailsSectionTitle: { color: COLORS.ink, fontSize: 19, fontWeight: '900' },
   description: {

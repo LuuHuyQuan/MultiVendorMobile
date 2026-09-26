@@ -163,6 +163,7 @@ export function ProductCard({
   onAdd,
   onToggleLike,
 }: ProductCardProps) {
+  const discounted = product.discount > 0 && product.oldPrice > product.price;
   return (
     <View
       style={[
@@ -189,9 +190,11 @@ export function ProductCard({
             style={styles.productImage}
           />
         </Pressable>
-        <View style={[styles.discountBadge, styles.pointerEventsNone]}>
-          <Text style={styles.discountText}>GIẢM {product.discount}%</Text>
-        </View>
+        {discounted ? (
+          <View style={[styles.discountBadge, styles.pointerEventsNone]}>
+            <Text style={styles.discountText}>GIẢM {product.discount}%</Text>
+          </View>
+        ) : null}
         <Pressable
           accessibilityLabel={`${
             liked ? 'Bỏ khỏi yêu thích' : 'Thêm vào yêu thích'
@@ -236,7 +239,7 @@ export function ProductCard({
       </View>
       <View style={styles.priceRow}>
         <Text style={styles.price}>{money(product.price)}</Text>
-        {!compact ? (
+        {!compact && discounted ? (
           <Text style={styles.oldPrice}>{money(product.oldPrice)}</Text>
         ) : null}
       </View>

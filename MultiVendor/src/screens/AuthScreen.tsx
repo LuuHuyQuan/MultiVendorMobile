@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, IconName } from '../components/Icon';
+import { isApiError } from '../api/errors';
 import { COLORS } from '../theme';
 
 export type AuthMode = 'login' | 'register';
@@ -39,6 +40,27 @@ function getFriendlyError(error: unknown, mode: AuthMode) {
     mode === 'login'
       ? 'Không thể đăng nhập. Vui lòng thử lại.'
       : 'Không thể tạo tài khoản. Vui lòng thử lại.';
+
+  if (isApiError(error)) {
+    if (error.status === 429) {
+      return 'Bạn đã thử quá nhiều lần. Vui lòng đợi một lúc rồi thử lại.';
+    }
+    if (mode === 'login' && (error.status === 400 || error.status === 401)) {
+      return 'Email hoặc mật khẩu chưa chính xác.';
+    }
+    if (mode === 'register' && error.status === 409) {
+      return 'Email này đã được đăng ký.';
+    }
+    if (error.validationErrors) {
+      const firstMessage = Object.values(error.validationErrors)
+        .flat()
+        .find(message => message.trim());
+      if (firstMessage) return firstMessage;
+    }
+    if (error.status >= 500) {
+      return 'Dịch vụ đang gặp sự cố. Vui lòng thử lại sau.';
+    }
+  }
 
   if (!(error instanceof Error)) return fallback;
 
@@ -110,6 +132,7 @@ export function AuthScreen({
     setMode(nextMode);
     setErrors({});
     setRequestError('');
+    setPassword('');
     setShowPassword(false);
   };
 

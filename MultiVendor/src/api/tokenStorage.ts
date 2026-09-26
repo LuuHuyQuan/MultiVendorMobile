@@ -8,6 +8,7 @@ const EXPIRATION_SKEW_MS = 30_000;
 let cachedSession: StoredAuthSession | null | undefined;
 let sessionRead: Promise<StoredAuthSession | null> | null = null;
 let storageWrites: Promise<void> = Promise.resolve();
+let sessionRevision = 0;
 
 const isStoredAuthSession = (value: unknown): value is StoredAuthSession => {
   if (typeof value !== 'object' || value === null) {
@@ -23,7 +24,10 @@ const isStoredAuthSession = (value: unknown): value is StoredAuthSession => {
     typeof session.refreshToken === 'string' &&
     session.refreshToken.length > 0 &&
     typeof session.expiresAt === 'number' &&
-    Number.isFinite(session.expiresAt)
+    Number.isFinite(session.expiresAt) &&
+    (session.email === undefined ||
+      (typeof session.email === 'string' &&
+        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(session.email)))
   );
 };
 
@@ -33,6 +37,7 @@ const enqueueStorageWrite = (operation: () => Promise<void>): Promise<void> => {
 };
 
 const readSessionFromStorage = async (): Promise<StoredAuthSession | null> => {
+  const readRevision = sessionRevision;
   const serializedSession = await AsyncStorage.getItem(AUTH_SESSION_KEY);
 
   if (!serializedSession) {
@@ -49,7 +54,13 @@ const readSessionFromStorage = async (): Promise<StoredAuthSession | null> => {
     // The invalid value is removed below.
   }
 
-  await enqueueStorageWrite(() => AsyncStorage.removeItem(AUTH_SESSION_KEY));
+  if (sessionRevision === readRevision) {
+    await enqueueStorageWrite(() =>
+      sessionRevision === readRevision
+        ? AsyncStorage.removeItem(AUTH_SESSION_KEY)
+        : Promise.resolve(),
+    );
+  }
   return null;
 };
 
@@ -82,14 +93,17 @@ export const getStoredSession = async (): Promise<StoredAuthSession | null> => {
 
 export const storeAuthTokens = async (
   tokens: AuthTokenResponse,
+  email?: string,
 ): Promise<StoredAuthSession> => {
   const session: StoredAuthSession = {
     tokenType: tokens.tokenType || 'Bearer',
     accessToken: tokens.accessToken,
     refreshToken: tokens.refreshToken,
     expiresAt: Date.now() + Math.max(0, tokens.expiresIn) * 1000,
+    ...(email ? { email: email.trim().toLowerCase() } : {}),
   };
 
+  sessionRevision += 1;
   cachedSession = session;
   await enqueueStorageWrite(() =>
     AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session)),
@@ -99,12 +113,16 @@ export const storeAuthTokens = async (
 };
 
 export const clearSession = async (): Promise<void> => {
+  sessionRevision += 1;
   cachedSession = null;
   await enqueueStorageWrite(() => AsyncStorage.removeItem(AUTH_SESSION_KEY));
 };
 
 export const hasStoredSession = async (): Promise<boolean> =>
   Boolean((await getStoredSession())?.refreshToken);
+
+export const getStoredSessionEmail = async (): Promise<string | null> =>
+  (await getStoredSession())?.email ?? null;
 
 export const isAccessTokenExpiring = (
   session: StoredAuthSession,

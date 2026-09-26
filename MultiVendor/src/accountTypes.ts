@@ -3,6 +3,7 @@ export type AccountProfile = {
   email: string;
   phone: string;
   address: string;
+  district?: string;
   city: string;
   payment: 'cash' | 'card';
   notifications: boolean;
@@ -13,6 +14,7 @@ export const defaultAccountProfile: AccountProfile = {
   email: '',
   phone: '',
   address: '',
+  district: '',
   city: '',
   payment: 'cash',
   notifications: false,

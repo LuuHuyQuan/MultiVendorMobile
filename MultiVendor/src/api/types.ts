@@ -41,4 +41,11 @@ export interface StoredAuthSession {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
+  email?: string;
+}
+
+export interface CurrentUser {
+  id: number;
+  fullName: string;
+  roleName: string;
 }

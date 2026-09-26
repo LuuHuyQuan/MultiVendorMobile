@@ -5,27 +5,51 @@ import type {
   DemoCardDetails,
   Order,
   OrderLine,
+  Product,
 } from './types';
 
 const productMap = new Map(products.map(product => [product.id, product]));
+const mapFor = (catalog: Product[]) =>
+  catalog === products
+    ? productMap
+    : new Map(catalog.map(product => [product.id, product]));
 const cents = (amount: number) => Math.round(amount * 100);
 export const FREE_SHIPPING_THRESHOLD = 500;
 export const STANDARD_SHIPPING_FEE = 30;
 
-export function normalizeCart(value: unknown): CartQuantities {
+// Storefront product IDs are positive 32-bit integers. Preserve these IDs in
+// persisted carts while the network catalogue has not loaded yet.
+export const isRemoteProductId = (id: string): boolean =>
+  /^[1-9]\d{0,9}$/.test(id) && Number(id) <= 2_147_483_647;
+
+export const isRemoteCartId = (id: string): boolean => {
+  const [productId, variantId, extra] = id.split(':');
+  return (
+    extra === undefined &&
+    isRemoteProductId(productId) &&
+    (variantId === undefined || isRemoteProductId(variantId))
+  );
+};
+
+export function normalizeCart(
+  value: unknown,
+  catalog: Product[] = products,
+  preserveRemoteIds = false,
+): CartQuantities {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
   }
   const cart: CartQuantities = {};
+  const currentProductMap = mapFor(catalog);
   for (const [id, quantity] of Object.entries(value)) {
-    const product = productMap.get(id);
-    if (
-      product &&
-      typeof quantity === 'number' &&
-      Number.isFinite(quantity) &&
-      quantity >= 1
-    ) {
+    const product = currentProductMap.get(id);
+    if (typeof quantity !== 'number' || !Number.isFinite(quantity) || quantity < 1) {
+      continue;
+    }
+    if (product && product.stock > 0) {
       cart[id] = Math.min(product.stock, Math.floor(quantity));
+    } else if (preserveRemoteIds && isRemoteCartId(id)) {
+      cart[id] = Math.min(999, Math.floor(quantity));
     }
   }
   return cart;
@@ -35,8 +59,9 @@ export function changeQuantity(
   cart: CartQuantities,
   id: string,
   quantity: number,
+  catalog: Product[] = products,
 ): CartQuantities {
-  return normalizeCart({ ...cart, [id]: quantity });
+  return normalizeCart({ ...cart, [id]: quantity }, catalog);
 }
 
 export function normalizeCoupon(value: unknown): string {
@@ -45,15 +70,23 @@ export function normalizeCoupon(value: unknown): string {
     : '';
 }
 
-export function orderLines(cart: CartQuantities): OrderLine[] {
-  return Object.entries(normalizeCart(cart)).map(([productId, quantity]) => {
-    const product = productMap.get(productId)!;
+export function orderLines(
+  cart: CartQuantities,
+  catalog: Product[] = products,
+): OrderLine[] {
+  const currentProductMap = mapFor(catalog);
+  return Object.entries(normalizeCart(cart, catalog)).map(([productId, quantity]) => {
+    const product = currentProductMap.get(productId)!;
     return { productId, quantity, name: product.name, price: product.price };
   });
 }
 
-export function calculateTotals(cart: CartQuantities, coupon = '') {
-  const lines = orderLines(cart);
+export function calculateTotals(
+  cart: CartQuantities,
+  coupon = '',
+  catalog: Product[] = products,
+) {
+  const lines = orderLines(cart, catalog);
   const subtotalCents = lines.reduce(
     (sum, line) => sum + cents(line.price) * line.quantity,
     0,
@@ -137,11 +170,12 @@ export function createOrder(
   details: CustomerDetails,
   id: string,
   now = new Date(),
+  catalog: Product[] = products,
 ): Order | null {
-  const totals = calculateTotals(cart, coupon);
+  const totals = calculateTotals(cart, coupon, catalog);
   if (!totals.itemCount || Object.keys(validateDelivery(details)).length)
     return null;
-  const lines = orderLines(cart);
+  const lines = orderLines(cart, catalog);
   return {
     id,
     date: now.toLocaleDateString('vi-VN', {
@@ -168,6 +202,7 @@ export function createOrder(
 export function reorderCart(
   cart: CartQuantities,
   order: Order,
+  catalog: Product[] = products,
 ): CartQuantities {
   const next = { ...cart };
   const lines =
@@ -176,5 +211,5 @@ export function reorderCart(
   lines.forEach(line => {
     next[line.productId] = (next[line.productId] ?? 0) + line.quantity;
   });
-  return normalizeCart(next);
+  return normalizeCart(next, catalog);
 }

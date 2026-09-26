@@ -12,11 +12,17 @@ import { ProductCard, SearchBar } from '../components/SellzyUI';
 import { Icon, IconName } from '../components/Icon';
 import { categories, products, sellers } from '../data/catalog';
 import { COLORS } from '../theme';
+import type { Product } from '../types';
+
+type CategoryOption = { id: string; label: string; tint?: string };
 
 type Props = {
   topInset: number;
   cartCount: number;
   wishlistIds: string[];
+  catalogProducts?: Product[];
+  catalogCategories?: CategoryOption[];
+  liveCatalog?: boolean;
   onShop: (
     category?: string,
     query?: string,
@@ -88,6 +94,9 @@ export default function HomeScreen({
   topInset,
   cartCount,
   wishlistIds,
+  catalogProducts = products,
+  catalogCategories = categories,
+  liveCatalog = false,
   onShop,
   onCart,
   onOpenProduct,
@@ -110,10 +119,16 @@ export default function HomeScreen({
         ]}
       >
         <Icon name="leaf" size={14} color={COLORS.white} />
-        <Text style={styles.promoText}>Thiết yếu cho cuộc sống khỏe</Text>
-        <View style={styles.promoBadge}>
-          <Text style={styles.promoBadgeText}>GIẢM TỚI 31%</Text>
-        </View>
+        <Text style={styles.promoText}>
+          {liveCatalog
+            ? 'Khám phá sản phẩm từ nhiều cửa hàng'
+            : 'Thiết yếu cho cuộc sống khỏe'}
+        </Text>
+        {!liveCatalog ? (
+          <View style={styles.promoBadge}>
+            <Text style={styles.promoBadgeText}>GIẢM TỚI 31%</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.header}>
@@ -159,10 +174,14 @@ export default function HomeScreen({
 
       <View style={styles.hero}>
         <View style={styles.heroOfferRow}>
-          <Text style={styles.heroEyebrow}>ƯU ĐÃI ĐỘC QUYỀN</Text>
-          <View style={styles.heroBadge}>
-            <Text style={styles.heroBadgeText}>GIẢM TỚI 31%</Text>
-          </View>
+          <Text style={styles.heroEyebrow}>
+            {liveCatalog ? 'MUA SẮM DỄ DÀNG' : 'ƯU ĐÃI ĐỘC QUYỀN'}
+          </Text>
+          {!liveCatalog ? (
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>GIẢM TỚI 31%</Text>
+            </View>
+          ) : null}
         </View>
         <Text style={styles.heroTitle}>
           Chăm sóc sức khỏe mỗi ngày, gọn trong một nơi.
@@ -208,7 +227,11 @@ export default function HomeScreen({
               <Icon name={item.icon} size={20} color={COLORS.tealDark} />
             </View>
             <Text style={styles.benefitTitle}>{item.title}</Text>
-            <Text style={styles.benefitText}>{item.text}</Text>
+            <Text style={styles.benefitText}>
+              {liveCatalog && item.icon === 'truck'
+                ? 'Giao hàng đến địa chỉ của bạn'
+                : item.text}
+            </Text>
           </View>
         ))}
       </ScrollView>
@@ -224,72 +247,81 @@ export default function HomeScreen({
         horizontal
         showsHorizontalScrollIndicator={false}
       >
-        {categories.slice(1).map(category => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Xem danh mục ${category.label}`}
-            testID={`home-category-${category.id}`}
-            key={category.id}
-            onPress={() => onShop(category.id)}
-            style={({ pressed }) => [
-              styles.category,
-              pressed && styles.pressed,
-            ]}
-          >
-            <View
-              style={[styles.categoryIcon, { backgroundColor: category.tint }]}
+        {catalogCategories
+          .filter(category => category.id !== 'All')
+          .map(category => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Xem danh mục ${category.label}`}
+              testID={`home-category-${category.id}`}
+              key={category.id}
+              onPress={() => onShop(category.id)}
+              style={({ pressed }) => [
+                styles.category,
+                pressed && styles.pressed,
+              ]}
             >
-              <Icon
-                name={categoryIcons[category.id] ?? 'shop'}
-                size={27}
-                color={COLORS.tealDark}
-              />
-            </View>
-            <Text numberOfLines={2} style={styles.categoryLabel}>
-              {category.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <SectionHeading
-        action="Xem tất cả"
-        onAction={() => onShop(undefined, undefined, 'discount')}
-        subtitle="Ưu đãi có hạn cho những sản phẩm được yêu thích"
-        title="Giảm giá mỗi ngày"
-      />
-      <ScrollView
-        contentContainerStyle={styles.productList}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        {[...products]
-          .sort((a, b) => b.discount - a.discount)
-          .slice(0, 6)
-          .map(product => (
-            <ProductCard
-              key={product.id}
-              liked={wishlistIds.includes(product.id)}
-              onAdd={() => onAdd(product.id)}
-              onOpen={() => onOpenProduct(product.id)}
-              onToggleLike={() => onToggleLike(product.id)}
-              product={product}
-            />
+              <View
+                style={[
+                  styles.categoryIcon,
+                  { backgroundColor: category.tint ?? COLORS.tealSoft },
+                ]}
+              >
+                <Icon
+                  name={categoryIcons[category.id] ?? 'shop'}
+                  size={27}
+                  color={COLORS.tealDark}
+                />
+              </View>
+              <Text numberOfLines={2} style={styles.categoryLabel}>
+                {category.label}
+              </Text>
+            </Pressable>
           ))}
       </ScrollView>
+
+      {!liveCatalog || catalogProducts.some(product => product.discount > 0) ? (
+        <>
+          <SectionHeading
+            action="Xem tất cả"
+            onAction={() => onShop(undefined, undefined, 'discount')}
+            subtitle="Ưu đãi có hạn cho những sản phẩm được yêu thích"
+            title="Giảm giá mỗi ngày"
+          />
+          <ScrollView
+            contentContainerStyle={styles.productList}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+          >
+            {[...catalogProducts]
+              .sort((a, b) => b.discount - a.discount)
+              .slice(0, 6)
+              .map(product => (
+                <ProductCard
+                  key={product.id}
+                  liked={wishlistIds.includes(product.id)}
+                  onAdd={() => onAdd(product.id)}
+                  onOpen={() => onOpenProduct(product.id)}
+                  onToggleLike={() => onToggleLike(product.id)}
+                  product={product}
+                />
+              ))}
+          </ScrollView>
+        </>
+      ) : null}
 
       <SectionHeading
         action="Xem tất cả"
         onAction={() => onShop(undefined, undefined, 'popular')}
-        subtitle="Được khách hàng lựa chọn và đánh giá cao"
-        title="Sản phẩm bán chạy"
+        subtitle="Những sản phẩm được nhiều người quan tâm"
+        title={liveCatalog ? 'Sản phẩm nổi bật' : 'Sản phẩm bán chạy'}
       />
       <ScrollView
         contentContainerStyle={styles.productList}
         horizontal
         showsHorizontalScrollIndicator={false}
       >
-        {[...products]
+        {[...catalogProducts]
           .sort((a, b) => b.reviews - a.reviews)
           .slice(0, 6)
           .map(product => (
@@ -314,7 +346,7 @@ export default function HomeScreen({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Xem bộ sưu tập sống khỏe"
-          onPress={() => onShop('Wellness')}
+          onPress={() => onShop(liveCatalog ? undefined : 'Wellness')}
           style={styles.dealButton}
         >
           <Text style={styles.dealButtonText}>Xem bộ sưu tập</Text>
@@ -333,24 +365,36 @@ export default function HomeScreen({
       </View>
 
       <View style={styles.promoSection}>
-        <Text style={styles.promoSectionLabel}>ƯU ĐÃI DÀNH RIÊNG CHO BẠN</Text>
+        <Text style={styles.promoSectionLabel}>
+          {liveCatalog ? 'KHÁM PHÁ DANH MỤC' : 'ƯU ĐÃI DÀNH RIÊNG CHO BẠN'}
+        </Text>
         <Text style={styles.promoSectionTitle}>Mua sắm khỏe mạnh hơn</Text>
         <View style={styles.promoCards}>
           <Pressable
             accessibilityLabel="Khám phá ưu đãi vitamin"
             accessibilityRole="button"
-            onPress={() => onShop('Vitamins', undefined, 'discount')}
+            onPress={() =>
+              liveCatalog ? onShop() : onShop('Vitamins', undefined, 'discount')
+            }
             style={({ pressed }) => [
               styles.promoCard,
               styles.promoCardGold,
               pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.promoCardEyebrow}>ƯU ĐÃI CÓ THỜI HẠN</Text>
-            <Text style={styles.promoCardTitle}>
-              Tiết kiệm đến 30% cho vitamin
+            <Text style={styles.promoCardEyebrow}>
+              {liveCatalog ? 'CHỌN SẢN PHẨM PHÙ HỢP' : 'ƯU ĐÃI CÓ THỜI HẠN'}
             </Text>
-            <Text style={styles.promoCardText}>Áp dụng đến khi hết hàng.</Text>
+            <Text style={styles.promoCardTitle}>
+              {liveCatalog
+                ? 'Chăm sóc sức khỏe mỗi ngày'
+                : 'Tiết kiệm đến 30% cho vitamin'}
+            </Text>
+            <Text style={styles.promoCardText}>
+              {liveCatalog
+                ? 'Tìm lựa chọn dành cho bạn.'
+                : 'Áp dụng đến khi hết hàng.'}
+            </Text>
             <View style={styles.promoCardLink}>
               <Text style={styles.promoCardLinkText}>Mua ngay</Text>
               <Icon name="arrow-right" color={COLORS.tealDark} size={15} />
@@ -364,7 +408,7 @@ export default function HomeScreen({
           <Pressable
             accessibilityLabel="Khám phá thiết bị chăm sóc sức khỏe"
             accessibilityRole="button"
-            onPress={() => onShop('Devices')}
+            onPress={() => onShop(liveCatalog ? undefined : 'Devices')}
             style={({ pressed }) => [
               styles.promoCard,
               styles.promoCardMint,
@@ -393,16 +437,16 @@ export default function HomeScreen({
 
       <SectionHeading
         action="Xem tất cả"
-        onAction={() => onShop(undefined, undefined, 'price-desc')}
-        subtitle="Khám phá những sản phẩm vừa có mặt tại Sellzy"
-        title="Sản phẩm mới ra mắt"
+        onAction={() => onShop()}
+        subtitle="Thêm những lựa chọn phù hợp cho bạn"
+        title="Khám phá thêm"
       />
       <ScrollView
         contentContainerStyle={styles.productList}
         horizontal
         showsHorizontalScrollIndicator={false}
       >
-        {[...products]
+        {[...catalogProducts]
           .reverse()
           .slice(0, 6)
           .map(product => (
@@ -421,40 +465,46 @@ export default function HomeScreen({
       <SectionHeading
         action="Xem cửa hàng"
         onAction={onSellers}
-        subtitle="Cửa hàng được chọn lọc, chất lượng được kiểm tra"
-        title="Gian hàng tin cậy"
+        subtitle={
+          liveCatalog
+            ? 'Tìm thêm sản phẩm từ các cửa hàng'
+            : 'Cửa hàng được chọn lọc, chất lượng được kiểm tra'
+        }
+        title={liveCatalog ? 'Gian hàng' : 'Gian hàng tin cậy'}
       />
-      <View style={styles.sellerPreview}>
-        {sellers.slice(0, 3).map((seller, index) => (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Xem ${seller.name}`}
-            onPress={onSellers}
-            key={seller.name}
-            style={styles.sellerMini}
-          >
-            <View
-              style={[
-                styles.sellerAvatar,
-                index === 1 && styles.sellerAvatarYellow,
-              ]}
+      {!liveCatalog ? (
+        <View style={styles.sellerPreview}>
+          {sellers.slice(0, 3).map((seller, index) => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Xem ${seller.name}`}
+              onPress={onSellers}
+              key={seller.name}
+              style={styles.sellerMini}
             >
-              <Text style={styles.sellerAvatarText}>
-                {seller.name.charAt(0)}
+              <View
+                style={[
+                  styles.sellerAvatar,
+                  index === 1 && styles.sellerAvatarYellow,
+                ]}
+              >
+                <Text style={styles.sellerAvatarText}>
+                  {seller.name.charAt(0)}
+                </Text>
+              </View>
+              <Text numberOfLines={1} style={styles.sellerName}>
+                {seller.name}
               </Text>
-            </View>
-            <Text numberOfLines={1} style={styles.sellerName}>
-              {seller.name}
-            </Text>
-            <View style={styles.sellerRatingRow}>
-              <Icon name="star" filled size={10} color={COLORS.orange} />
-              <Text style={styles.sellerRating}>
-                {seller.rating.toFixed(1)}
-              </Text>
-            </View>
-          </Pressable>
-        ))}
-      </View>
+              <View style={styles.sellerRatingRow}>
+                <Icon name="star" filled size={10} color={COLORS.orange} />
+                <Text style={styles.sellerRating}>
+                  {seller.rating.toFixed(1)}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
 
       <SectionHeading
         action="Xem sản phẩm"
@@ -472,7 +522,7 @@ export default function HomeScreen({
             accessibilityLabel={`Xem ${tip.category}`}
             accessibilityRole="button"
             key={tip.title}
-            onPress={() => onShop(tip.shopCategory)}
+            onPress={() => onShop(liveCatalog ? undefined : tip.shopCategory)}
             style={({ pressed }) => [styles.tipCard, pressed && styles.pressed]}
           >
             <View style={styles.tipImageWrap}>
@@ -490,7 +540,7 @@ export default function HomeScreen({
               {tip.text}
             </Text>
             <View style={styles.tipLink}>
-              <Text style={styles.tipLinkText}>Đọc thêm</Text>
+              <Text style={styles.tipLinkText}>Xem sản phẩm</Text>
               <Icon name="arrow-right" color={COLORS.teal} size={15} />
             </View>
           </Pressable>
