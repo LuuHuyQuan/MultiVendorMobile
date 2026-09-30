@@ -17,7 +17,8 @@ const isStoredAuthSession = (value: unknown): value is StoredAuthSession => {
 
   const session = value as Partial<StoredAuthSession>;
 
-  return (
+  return ( 
+    
     typeof session.tokenType === 'string' &&
     typeof session.accessToken === 'string' &&
     session.accessToken.length > 0 &&
@@ -30,12 +31,10 @@ const isStoredAuthSession = (value: unknown): value is StoredAuthSession => {
         /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(session.email)))
   );
 };
-
 const enqueueStorageWrite = (operation: () => Promise<void>): Promise<void> => {
   storageWrites = storageWrites.catch(() => undefined).then(operation);
   return storageWrites;
 };
-
 const readSessionFromStorage = async (): Promise<StoredAuthSession | null> => {
   const readRevision = sessionRevision;
   const serializedSession = await AsyncStorage.getItem(AUTH_SESSION_KEY);
