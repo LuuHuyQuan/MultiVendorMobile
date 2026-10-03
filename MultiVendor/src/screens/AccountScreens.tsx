@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -10,11 +11,14 @@ import {
   View,
 } from 'react-native';
 
+import type {
+  CustomerOrderDetail,
+  CustomerReturnLineRequest,
+} from '../api/customerOrders';
+
 import {
   AccountProfile,
   AuthSession,
-  emptyVendorDraft,
-  VendorDraft,
 } from '../accountTypes';
 import {
   EmptyState,
@@ -66,23 +70,58 @@ function getCatalogueSellers(catalogProducts: Product[]) {
 type OrdersProps = {
   topInset: number;
   orders: Order[];
+  synced?: boolean;
+  loading?: boolean;
+  loadError?: string;
   catalogProducts?: Product[];
   cartCount: number;
   onCart: () => void;
   onShop: () => void;
   onOpenProduct: (id: string) => void;
   onReorder: (order: Order) => void;
+  onReorderServer: (order: Order, detail: CustomerOrderDetail) => void;
+  onRefresh: () => void;
+  onLoadDetail: (id: number) => Promise<CustomerOrderDetail>;
+  onCancelOrder: (id: number, reason: string) => Promise<void>;
+  onRequestReturn: (
+    id: number,
+    reason: string,
+    lines: CustomerReturnLineRequest[],
+  ) => Promise<void>;
+};
+
+const orderStatusLabel = (name?: string) => {
+  switch (name?.toLowerCase()) {
+    case 'pending': return 'Chờ xác nhận';
+    case 'confirmed': return 'Đã xác nhận';
+    case 'processing': return 'Đang chuẩn bị';
+    case 'packed': return 'Đã đóng gói';
+    case 'shipped':
+    case 'in_transit': return 'Đang giao';
+    case 'delivered': return 'Đã giao';
+    case 'cancelled': return 'Đã hủy';
+    case 'returned': return 'Đã trả hàng';
+    default: return name || 'Đang xử lý';
+  }
 };
 
 export function OrdersScreen({
   topInset,
   orders,
+  synced = false,
+  loading = false,
+  loadError,
   catalogProducts = products,
   cartCount,
   onCart,
   onShop,
   onOpenProduct,
   onReorder,
+  onReorderServer,
+  onRefresh,
+  onLoadDetail,
+  onCancelOrder,
+  onRequestReturn,
 }: OrdersProps) {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const hasPlacedOrders = orders.some(order => order.simulated === false);
@@ -92,14 +131,24 @@ export function OrdersScreen({
       <ScreenHeader
         cartCount={cartCount}
         onCart={onCart}
-        subtitle="Tóm tắt đơn hàng đã lưu trên thiết bị"
+        subtitle={synced ? 'Lịch sử đơn hàng từ cửa hàng' : 'Đơn hàng đã lưu trên thiết bị'}
         title="Đơn hàng của tôi"
       />
-      {!orders.length ? (
+      {loading && !orders.length ? (
+        <View style={styles.orderLoading}>
+          <ActivityIndicator color={COLORS.teal} />
+          <Text style={styles.orderLoadingText}>Đang tải lịch sử đơn hàng…</Text>
+        </View>
+      ) : loadError && !orders.length ? (
+        <View style={styles.orderLoading}>
+          <Text style={styles.orderErrorText}>Không thể tải đơn hàng: {loadError}</Text>
+          <AccountAction label="Thử lại" onPress={onRefresh} />
+        </View>
+      ) : !orders.length ? (
         <EmptyState
           actionLabel="Khám phá sản phẩm"
           icon="▣"
-          message="Đặt một đơn hàng để xem tóm tắt tại đây."
+          message="Đặt một đơn hàng để xem tại đây."
           onAction={onShop}
           title="Chưa có đơn hàng"
         />
@@ -108,13 +157,25 @@ export function OrdersScreen({
           contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
+          {loadError ? (
+            <Pressable onPress={onRefresh} style={styles.orderError}>
+              <Text style={styles.orderErrorText}>
+                Không thể đồng bộ đơn hàng: {loadError} Nhấn để thử lại.
+              </Text>
+            </Pressable>
+          ) : null}
+          {loading ? (
+            <Text style={styles.orderLoadingText}>Đang cập nhật từ cửa hàng…</Text>
+          ) : null}
           <View style={styles.infoBanner}>
             <View style={styles.infoIcon}>
               <Icon color={COLORS.white} name="info" size={16} />
             </View>
             <Text style={styles.infoText}>
-              {hasPlacedOrders
-                ? 'Đơn đặt với cửa hàng có tóm tắt được lưu trên thiết bị này. Trạng thái hiển thị có thể chưa được cập nhật; ứng dụng chưa đồng bộ lịch sử và theo dõi giao hàng.'
+              {hasPlacedOrders && synced
+                ? 'Đơn hàng và trạng thái được đồng bộ từ cửa hàng. Mở chi tiết để xem hàng hóa, vận chuyển và các thao tác được hỗ trợ.'
+                : hasPlacedOrders
+                ? 'Đang hiển thị bản tóm tắt đã lưu trên thiết bị. Trạng thái có thể chưa được cập nhật.'
                 : 'Đơn hàng mẫu được lưu trên thiết bị này. Mở chi tiết để xem sản phẩm và thông tin giao hàng; chưa có thanh toán hoặc vận chuyển thực tế.'}
               {hasPlacedOrders && hasDemoOrders
                 ? ' Các đơn hàng mẫu trong danh sách không được gửi tới cửa hàng.'
@@ -131,18 +192,20 @@ export function OrdersScreen({
                 <View
                   style={[
                     styles.statusBadge,
-                    order.status === 'Delivered' && styles.statusDelivered,
+                    order.statusName === 'delivered' && styles.statusDelivered,
                   ]}
                 >
                   <Text
                     style={[
                       styles.statusText,
-                      order.status === 'Delivered' &&
+                      order.statusName === 'delivered' &&
                         styles.statusDeliveredText,
                     ]}
                   >
                     {order.simulated !== false
                       ? 'Đã lưu trên thiết bị'
+                      : order.statusName
+                      ? orderStatusLabel(order.statusName)
                       : order.status === 'Processing'
                       ? 'Đang xử lý'
                       : order.status === 'Shipped'
@@ -151,7 +214,7 @@ export function OrdersScreen({
                   </Text>
                 </View>
               </View>
-              <View style={styles.orderProducts}>
+              {order.productIds.length ? <View style={styles.orderProducts}>
                 {order.productIds.slice(0, 4).map(id => {
                   const product =
                     catalogProducts.find(item => item.id === id) ??
@@ -182,7 +245,7 @@ export function OrdersScreen({
                     </View>
                   );
                 })}
-              </View>
+              </View> : null}
               <View style={styles.orderBottom}>
                 <View>
                   <Text style={styles.orderItems}>
@@ -199,14 +262,14 @@ export function OrdersScreen({
                   >
                     <Text style={styles.reorderText}>Chi tiết</Text>
                   </Pressable>
-                  <Pressable
+                  {!order.serverId ? <Pressable
                     accessibilityLabel={`Mua lại đơn hàng ${order.id}`}
                     accessibilityRole="button"
                     onPress={() => onReorder(order)}
                     style={styles.reorderButton}
                   >
                     <Text style={styles.reorderText}>Mua lại</Text>
-                  </Pressable>
+                  </Pressable> : null}
                 </View>
               </View>
             </View>
@@ -215,9 +278,14 @@ export function OrdersScreen({
       )}
       {selectedOrder ? (
         <OrderDetails
+          key={selectedOrder.id}
           onClose={() => setSelectedOrder(null)}
-          onReorder={() => {
-            onReorder(selectedOrder);
+          onLoadDetail={onLoadDetail}
+          onCancelOrder={onCancelOrder}
+          onRequestReturn={onRequestReturn}
+          onReorder={detail => {
+            if (detail) onReorderServer(selectedOrder, detail);
+            else onReorder(selectedOrder);
             setSelectedOrder(null);
           }}
           order={selectedOrder}
@@ -231,11 +299,33 @@ function OrderDetails({
   order,
   onClose,
   onReorder,
+  onLoadDetail,
+  onCancelOrder,
+  onRequestReturn,
 }: {
   order: Order;
   onClose: () => void;
-  onReorder: () => void;
+  onReorder: (detail?: CustomerOrderDetail) => void;
+  onLoadDetail: (id: number) => Promise<CustomerOrderDetail>;
+  onCancelOrder: (id: number, reason: string) => Promise<void>;
+  onRequestReturn: (
+    id: number,
+    reason: string,
+    lines: CustomerReturnLineRequest[],
+  ) => Promise<void>;
 }) {
+  if (order.serverId) {
+    return (
+      <ServerOrderDetails
+        order={order}
+        onClose={onClose}
+        onReorder={onReorder}
+        onLoadDetail={onLoadDetail}
+        onCancelOrder={onCancelOrder}
+        onRequestReturn={onRequestReturn}
+      />
+    );
+  }
   return (
     <AccountDialog onClose={onClose} subtitle={order.date} title={order.id}>
       <AccountNotice>
@@ -279,6 +369,7 @@ function OrderDetails({
             value={order.shipping === 0 ? 'Miễn phí' : money(order.shipping)}
           />
         ) : null}
+        {order.tax ? <SummaryLine label="Thuế" value={money(order.tax)} /> : null}
         <SummaryLine label="Tổng đơn hàng" value={money(order.total)} />
       </View>
       {order.delivery ? (
@@ -305,7 +396,316 @@ function OrderDetails({
         Mua lại sử dụng giá và tồn kho hiện tại. Đơn hàng đã lưu của bạn không
         thay đổi.
       </Text>
-      <AccountAction label="Thêm sản phẩm vào giỏ" onPress={onReorder} />
+      <AccountAction label="Thêm sản phẩm vào giỏ" onPress={() => onReorder()} />
+    </AccountDialog>
+  );
+}
+
+const formatOrderDate = (value: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+};
+
+const parseShippingAddress = (value: string) => {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const address = parsed as Record<string, unknown>;
+    const field = (name: string) =>
+      typeof address[name] === 'string' ? (address[name] as string) : '';
+    return {
+      name: field('recipientName'),
+      phone: field('phone'),
+      text: [field('addressLine'), field('ward'), field('district'), field('province')]
+        .filter(Boolean).join(', '),
+    };
+  } catch {
+    return null;
+  }
+};
+
+function ServerOrderDetails({
+  order,
+  onClose,
+  onReorder,
+  onLoadDetail,
+  onCancelOrder,
+  onRequestReturn,
+}: {
+  order: Order;
+  onClose: () => void;
+  onReorder: (detail: CustomerOrderDetail) => void;
+  onLoadDetail: (id: number) => Promise<CustomerOrderDetail>;
+  onCancelOrder: (id: number, reason: string) => Promise<void>;
+  onRequestReturn: (
+    id: number,
+    reason: string,
+    lines: CustomerReturnLineRequest[],
+  ) => Promise<void>;
+}) {
+  const id = order.serverId!;
+  const [detail, setDetail] = useState<CustomerOrderDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const [action, setAction] = useState<'cancel' | 'return' | null>(null);
+  const [reason, setReason] = useState('');
+  const [quantities, setQuantities] = useState<Record<number, number>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError('');
+    onLoadDetail(id).then(result => {
+      if (active) setDetail(result);
+    }).catch(cause => {
+      if (active) setError(cause instanceof Error ? cause.message : 'Không tải được chi tiết đơn hàng.');
+    }).finally(() => {
+      if (active) setLoading(false);
+    });
+    return () => { active = false; };
+  }, [id, onLoadDetail, refresh]);
+
+  const canCancel = (
+    detail?.order.statusName === 'pending' ||
+    detail?.order.statusName === 'confirmed'
+  ) && detail.sellerOrders.every(seller =>
+    seller.statusName === 'pending' || seller.statusName === 'confirmed');
+  const eligibleReturns = detail?.items.flatMap(item => {
+    const shipment = detail.sellerOrders.find(seller => seller.id === item.sellerOrderId);
+    if (shipment?.statusName !== 'delivered' || !shipment.deliveredAt) return [];
+    const deliveredAt = new Date(shipment.deliveredAt).getTime();
+    if (!Number.isFinite(deliveredAt) ||
+      Date.now() - deliveredAt > detail.returnWindowDays * 24 * 60 * 60 * 1000) return [];
+    const requested = detail.returnItems.reduce((total, returned) => {
+      if (returned.orderItemId !== item.id) return total;
+      const parent = detail.returns.find(request => request.id === returned.returnRequestId);
+      return parent && parent.statusName !== 'rejected' && parent.statusName !== 'cancelled'
+        ? total + returned.quantity : total;
+    }, 0);
+    const remaining = item.quantity - requested;
+    return remaining > 0 ? [{ item, remaining }] : [];
+  }) ?? [];
+  const shipping = detail ? parseShippingAddress(detail.order.shippingAddressJson) : null;
+
+  const submitAction = async () => {
+    if (!detail || submitting) return;
+    const trimmed = reason.trim();
+    if (trimmed.length < 3) {
+      setError('Vui lòng nhập lý do ít nhất 3 ký tự.');
+      return;
+    }
+    const selected = eligibleReturns.flatMap(({ item, remaining }) => {
+      const quantity = Math.min(remaining, quantities[item.id] ?? 0);
+      return quantity > 0 ? [{ orderItemId: item.id, quantity }] : [];
+    });
+    if (action === 'return' && !selected.length) {
+      setError('Vui lòng chọn số lượng hàng cần trả.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      if (action === 'cancel') {
+        await onCancelOrder(id, trimmed);
+        setNotice('Đã hủy đơn hàng.');
+      } else if (action === 'return') {
+        await onRequestReturn(id, trimmed, selected);
+        setNotice('Đã gửi yêu cầu trả hàng.');
+      }
+      setAction(null);
+      setReason('');
+      setQuantities({});
+      setRefresh(value => value + 1);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Không thể gửi yêu cầu.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <AccountDialog onClose={onClose} subtitle={order.date} title={order.id}>
+      {loading ? (
+        <View style={styles.orderLoading}>
+          <ActivityIndicator color={COLORS.teal} />
+          <Text style={styles.orderLoadingText}>Đang tải chi tiết đơn hàng…</Text>
+        </View>
+      ) : null}
+      {error ? (
+        <Pressable
+          disabled={!!detail}
+          onPress={() => setRefresh(value => value + 1)}
+          style={styles.orderError}
+        >
+          <Text style={styles.orderErrorText}>{error}</Text>
+          {!detail ? <Text style={styles.orderErrorText}>Nhấn để thử lại.</Text> : null}
+        </Pressable>
+      ) : null}
+      {notice ? <AccountNotice>{notice}</AccountNotice> : null}
+      {!detail && !loading && order.lines?.length ? (
+        <>
+          <AccountNotice>
+            Đây là bản tóm tắt lưu trên thiết bị. Hãy thử tải lại để xem trạng thái mới nhất.
+          </AccountNotice>
+          {order.lines.map(line => (
+            <View key={line.productId} style={styles.detailLine}>
+              <View style={styles.detailLineCopy}>
+                <Text style={styles.detailLineName}>{line.name}</Text>
+                <Text style={styles.detailLineMeta}>
+                  {line.quantity} × {money(line.price)}
+                </Text>
+              </View>
+              <Text style={styles.detailLinePrice}>
+                {money(line.price * line.quantity)}
+              </Text>
+            </View>
+          ))}
+          <View style={styles.detailSummary}>
+            <SummaryLine label="Tổng đơn hàng" value={money(order.total)} />
+          </View>
+        </>
+      ) : null}
+      {detail ? (
+        <>
+          <AccountNotice>
+            Trạng thái: {orderStatusLabel(detail.order.statusName)} · Thanh toán: {
+              detail.order.paymentStatus === 'paid' ? 'Đã thanh toán' :
+              detail.order.paymentStatus === 'refunded' ? 'Đã hoàn tiền' : 'Chưa thanh toán'
+            }
+          </AccountNotice>
+          {detail.items.map(item => (
+            <View key={item.id} style={styles.detailLine}>
+              <View style={styles.detailLineCopy}>
+                <Text style={styles.detailLineName}>
+                  {item.productName}{item.variantName && !/^(default|mặc định)$/i.test(item.variantName)
+                    ? ` · ${item.variantName}` : ''}
+                </Text>
+                <Text style={styles.detailLineMeta}>
+                  {item.quantity} × {money(item.unitPrice / 1000)}
+                </Text>
+              </View>
+              <Text style={styles.detailLinePrice}>{money(item.lineTotal / 1000)}</Text>
+            </View>
+          ))}
+          <View style={styles.detailSummary}>
+            <SummaryLine label="Tạm tính" value={money(detail.order.subtotal / 1000)} />
+            {detail.order.discountTotal > 0 ? (
+              <SummaryLine label="Giảm giá" value={`−${money(detail.order.discountTotal / 1000)}`} />
+            ) : null}
+            <SummaryLine label="Giao hàng" value={money(detail.order.shippingTotal / 1000)} />
+            {detail.order.taxTotal > 0 ? (
+              <SummaryLine label="Thuế" value={money(detail.order.taxTotal / 1000)} />
+            ) : null}
+            <SummaryLine label="Tổng đơn hàng" value={money(detail.order.grandTotal / 1000)} />
+          </View>
+          {shipping ? (
+            <View style={styles.deliveryCard}>
+              <Text style={styles.detailSectionTitle}>Thông tin giao hàng</Text>
+              <Text style={styles.deliveryName}>{shipping.name}</Text>
+              <Text style={styles.deliveryText}>{shipping.phone}</Text>
+              <Text style={styles.deliveryText}>{shipping.text}</Text>
+              <Text style={styles.deliveryPayment}>
+                {order.paymentMethod?.toLowerCase() === 'wallet'
+                  ? 'Thanh toán bằng ví' : 'Thanh toán khi nhận hàng'}
+              </Text>
+            </View>
+          ) : null}
+          {detail.sellerOrders.length ? (
+            <View style={styles.deliveryCard}>
+              <Text style={styles.detailSectionTitle}>Vận chuyển theo cửa hàng</Text>
+              {detail.sellerOrders.map(seller => (
+                <View key={seller.id} style={styles.shipmentBlock}>
+                  <Text style={styles.detailLineName}>{seller.storeName} · {orderStatusLabel(seller.statusName)}</Text>
+                  {seller.trackingNumber ? (
+                    <Text style={styles.deliveryText}>
+                      {seller.shippingProvider ? `${seller.shippingProvider} · ` : ''}{seller.trackingNumber}
+                    </Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          ) : null}
+          {detail.history.length ? (
+            <View style={styles.deliveryCard}>
+              <Text style={styles.detailSectionTitle}>Lịch sử trạng thái</Text>
+              {detail.history.map(entry => (
+                <Text key={entry.id} style={styles.deliveryText}>
+                  {formatOrderDate(entry.changedAt)} · {orderStatusLabel(entry.newStatus)}
+                  {entry.note ? ` · ${entry.note}` : ''}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          {detail.returns.length ? (
+            <View style={styles.deliveryCard}>
+              <Text style={styles.detailSectionTitle}>Yêu cầu trả hàng</Text>
+              {detail.returns.map(item => (
+                <Text key={item.id} style={styles.deliveryText}>
+                  {item.returnNumber} · {item.statusName} · {formatOrderDate(item.requestedAt)}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          <Text style={styles.formHelp}>Mua lại sẽ dùng giá và tồn kho hiện tại.</Text>
+          <AccountAction label="Thêm sản phẩm vào giỏ" onPress={() => onReorder(detail)} />
+          {canCancel ? (
+            <AccountAction label="Yêu cầu hủy đơn" onPress={() => { setAction('cancel'); setError(''); }} />
+          ) : null}
+          {eligibleReturns.length ? (
+            <AccountAction label="Yêu cầu trả hàng" onPress={() => { setAction('return'); setError(''); }} />
+          ) : null}
+          {action ? (
+            <View style={styles.orderActionForm}>
+              <Text style={styles.detailSectionTitle}>
+                {action === 'cancel' ? 'Xác nhận hủy đơn' : 'Chọn hàng cần trả'}
+              </Text>
+              {action === 'return' ? eligibleReturns.map(({ item, remaining }) => (
+                <View key={item.id} style={styles.returnItem}>
+                  <Text style={styles.detailLineName}>{item.productName} · Còn {remaining}</Text>
+                  <View style={styles.quantityRow}>
+                    <Pressable
+                      accessibilityLabel={`Giảm số lượng trả ${item.productName}`}
+                      onPress={() => setQuantities(current => ({
+                        ...current, [item.id]: Math.max(0, (current[item.id] ?? 0) - 1),
+                      }))}
+                      style={styles.quantityButton}
+                    ><Text style={styles.quantityText}>−</Text></Pressable>
+                    <Text style={styles.quantityValue}>{quantities[item.id] ?? 0}</Text>
+                    <Pressable
+                      accessibilityLabel={`Tăng số lượng trả ${item.productName}`}
+                      onPress={() => setQuantities(current => ({
+                        ...current, [item.id]: Math.min(remaining, (current[item.id] ?? 0) + 1),
+                      }))}
+                      style={styles.quantityButton}
+                    ><Text style={styles.quantityText}>+</Text></Pressable>
+                  </View>
+                </View>
+              )) : null}
+              <AccountField
+                label="Lý do"
+                maxLength={action === 'cancel' ? 500 : 1000}
+                multiline
+                onChangeText={setReason}
+                placeholder="Nhập lý do ít nhất 3 ký tự"
+                value={reason}
+              />
+              <AccountAction
+                label={submitting ? 'Đang gửi…' : action === 'cancel' ? 'Xác nhận hủy' : 'Gửi yêu cầu trả hàng'}
+                onPress={submitAction}
+              />
+              <Pressable onPress={() => { setAction(null); setError(''); }} style={styles.orderDismiss}>
+                <Text style={styles.orderDismissText}>Đóng biểu mẫu</Text>
+              </Pressable>
+            </View>
+          ) : null}
+        </>
+      ) : null}
     </AccountDialog>
   );
 }
@@ -920,8 +1320,7 @@ export function SellersScreen({
   onBack,
   onCart,
   onShop,
-  vendorDraft,
-  onSaveVendorDraft,
+  onSellerOnboarding,
 }: {
   topInset: number;
   cartCount: number;
@@ -930,11 +1329,8 @@ export function SellersScreen({
   onBack: () => void;
   onCart: () => void;
   onShop: (store: string) => void;
-  vendorDraft?: VendorDraft;
-  onSaveVendorDraft: (draft: VendorDraft) => void;
+  onSellerOnboarding: () => void;
 }) {
-  const [showVendorForm, setShowVendorForm] = useState(false);
-  const [draftSaved, setDraftSaved] = useState(false);
   const catalogueSellers = catalogVendors
     ? catalogVendors.map((vendor, index) => ({
         ...vendor,
@@ -996,148 +1392,19 @@ export function SellersScreen({
             Phát triển cửa hàng cùng Sellzy
           </Text>
           <Text style={styles.vendorCalloutText}>
-            Lên kế hoạch cửa hàng bằng cách lưu bản nháp hồ sơ bán hàng trên
-            thiết bị. Đăng ký và xuất bản cửa hàng chưa được kết nối.
+            Gửi hồ sơ mở cửa hàng, theo dõi xét duyệt và bắt đầu bán hàng khi
+            tài khoản được duyệt.
           </Text>
-          {vendorDraft?.storeName ? (
-            <Text style={styles.vendorDraftLabel}>
-              Bản nháp đã lưu: {vendorDraft.storeName}
-            </Text>
-          ) : null}
-          {draftSaved ? (
-            <Text accessibilityLiveRegion="polite" style={styles.vendorDraftLabel}>
-              Đã lưu trên thiết bị. Chưa gửi hồ sơ đăng ký cửa hàng.
-            </Text>
-          ) : null}
           <Pressable
             accessibilityRole="button"
-            onPress={() => setShowVendorForm(true)}
+            onPress={onSellerOnboarding}
             style={styles.vendorButton}
           >
-            <Text style={styles.vendorButtonText}>
-              {vendorDraft?.storeName
-                ? 'Chỉnh sửa bản nháp cửa hàng'
-                : 'Trở thành nhà bán hàng'}
-            </Text>
+            <Text style={styles.vendorButtonText}>Trở thành nhà bán hàng</Text>
           </Pressable>
         </View>
       </ScrollView>
-      {showVendorForm ? (
-        <VendorForm
-          draft={vendorDraft ?? emptyVendorDraft}
-          onClose={() => setShowVendorForm(false)}
-          onSave={nextDraft => {
-            onSaveVendorDraft(nextDraft);
-            setShowVendorForm(false);
-            setDraftSaved(true);
-          }}
-        />
-      ) : null}
     </View>
-  );
-}
-
-function VendorForm({
-  draft,
-  onSave,
-  onClose,
-}: {
-  draft: VendorDraft;
-  onSave: (draft: VendorDraft) => void;
-  onClose: () => void;
-}) {
-  const [values, setValues] = useState(draft);
-  const [errors, setErrors] = useState<
-    Partial<Record<keyof VendorDraft, string>>
-  >({});
-  const update = (key: keyof VendorDraft, value: string) => {
-    setValues(current => ({ ...current, [key]: value }));
-    setErrors(current => ({ ...current, [key]: undefined }));
-  };
-  const save = () => {
-    const nextDraft = {
-      storeName: values.storeName.trim(),
-      ownerName: values.ownerName.trim(),
-      email: values.email.trim(),
-      category: values.category.trim(),
-      description: values.description.trim(),
-    };
-    const nextErrors: typeof errors = {};
-    if (nextDraft.storeName.length < 2) {
-      nextErrors.storeName = 'Vui lòng nhập tên cửa hàng có ít nhất 2 ký tự.';
-    }
-    if (nextDraft.ownerName.length < 2) {
-      nextErrors.ownerName = 'Vui lòng nhập họ và tên.';
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(nextDraft.email)) {
-      nextErrors.email = 'Vui lòng nhập email liên hệ hợp lệ.';
-    }
-    if (nextDraft.category.length < 2) {
-      nextErrors.category = 'Vui lòng nhập danh mục sản phẩm.';
-    }
-    setErrors(nextErrors);
-    if (!Object.keys(nextErrors).length) {
-      onSave(nextDraft);
-    }
-  };
-  return (
-    <AccountDialog
-      onClose={onClose}
-      subtitle="Chuẩn bị hồ sơ cửa hàng của bạn"
-      title="Bản nháp nhà bán hàng"
-    >
-      <AccountNotice>
-        Lưu bản nháp trên thiết bị. Biểu mẫu này không gửi đăng ký bán hàng hoặc
-        tạo cửa hàng công khai.
-      </AccountNotice>
-      <AccountField
-        autoCapitalize="words"
-        error={errors.storeName}
-        label="Tên cửa hàng"
-        maxLength={80}
-        onChangeText={value => update('storeName', value)}
-        placeholder="Nhập tên cửa hàng"
-        value={values.storeName}
-      />
-      <AccountField
-        autoCapitalize="words"
-        autoComplete="name"
-        error={errors.ownerName}
-        label="Tên chủ cửa hàng"
-        maxLength={80}
-        onChangeText={value => update('ownerName', value)}
-        placeholder="Nhập họ và tên"
-        value={values.ownerName}
-      />
-      <AccountField
-        autoCapitalize="none"
-        autoComplete="email"
-        error={errors.email}
-        keyboardType="email-address"
-        label="Email liên hệ"
-        maxLength={150}
-        onChangeText={value => update('email', value)}
-        placeholder="you@example.com"
-        value={values.email}
-      />
-      <AccountField
-        error={errors.category}
-        label="Danh mục sản phẩm"
-        maxLength={80}
-        onChangeText={value => update('category', value)}
-        placeholder="Ví dụ: Sống khỏe"
-        value={values.category}
-      />
-      <AccountField
-        label="Giới thiệu cửa hàng (không bắt buộc)"
-        maxLength={600}
-        multiline
-        onChangeText={value => update('description', value)}
-        placeholder="Chia sẻ điểm nổi bật của sản phẩm"
-        value={values.description}
-      />
-      <AccountAction label="Lưu bản nháp trên thiết bị" onPress={save} />
-    </AccountDialog>
   );
 }
 
@@ -1186,7 +1453,7 @@ export function HelpScreen({
     ],
     [
       'Làm sao để trở thành nhà bán hàng?',
-      'Mở Các cửa hàng rồi chạm Trở thành nhà bán hàng để tạo bản nháp hồ sơ cửa hàng. Bản nháp chỉ được lưu trên thiết bị; đăng ký bán hàng và cửa hàng công khai chưa được kết nối.',
+      'Mở Các cửa hàng rồi chạm Trở thành nhà bán hàng. Sau khi đăng nhập, nhập thông tin cửa hàng cùng liên kết giấy tờ xác minh và gửi hồ sơ để xét duyệt.',
     ],
   ];
   return (
@@ -1251,6 +1518,65 @@ export function HelpScreen({
 const styles = StyleSheet.create({
   pressed: { opacity: 0.72 },
   content: { padding: 16, paddingBottom: 30 },
+  orderLoading: {
+    padding: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  orderLoadingText: {
+    color: COLORS.muted,
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  orderError: {
+    padding: 14,
+    marginBottom: 14,
+    borderRadius: 12,
+    backgroundColor: '#FDECEF',
+  },
+  orderErrorText: {
+    color: COLORS.red,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  shipmentBlock: {
+    paddingVertical: 7,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  orderActionForm: {
+    marginTop: 16,
+    padding: 15,
+    borderRadius: 15,
+    backgroundColor: COLORS.surface,
+  },
+  returnItem: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  quantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 8,
+  },
+  quantityButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.teal,
+  },
+  quantityText: { color: COLORS.teal, fontSize: 20, fontWeight: '800' },
+  quantityValue: { minWidth: 22, textAlign: 'center', color: COLORS.ink },
+  orderDismiss: { padding: 12, alignItems: 'center' },
+  orderDismissText: { color: COLORS.muted, fontSize: 12, fontWeight: '700' },
   infoBanner: {
     padding: 13,
     marginBottom: 14,
@@ -1669,17 +1995,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 19,
     marginTop: 7,
-  },
-  vendorDraftLabel: {
-    alignSelf: 'flex-start',
-    color: COLORS.tealDark,
-    fontSize: 11,
-    fontWeight: '800',
-    marginTop: 12,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
-    borderRadius: 12,
-    backgroundColor: COLORS.white,
   },
   vendorButton: {
     minHeight: 44,

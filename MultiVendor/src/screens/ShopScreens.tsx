@@ -1,15 +1,21 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
 
+import {
+  customerShoppingApi,
+  type ProductReviewsPage,
+} from '../api/customerShopping';
 import {
   ProductCard,
   ScreenHeader,
@@ -274,11 +280,26 @@ export function ShopScreen({
 
 type DetailsProps = CommonProps & {
   product: Product;
+  isLoggedIn?: boolean;
   onBuyNow: (id: string, quantity: number, variantId?: number) => void;
 };
 
+const reviewStars = (rating: number) => {
+  const filled = Math.max(0, Math.min(5, Math.round(rating)));
+  return `${'★'.repeat(filled)}${'☆'.repeat(5 - filled)}`;
+};
+
+const reviewDate = (value: string) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('vi-VN');
+};
+
+const reviewErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : 'Không thể tải đánh giá. Vui lòng thử lại.';
+
 export function ProductDetailsScreen({
   product,
+  isLoggedIn = false,
   topInset,
   cartCount,
   wishlistIds,
@@ -294,6 +315,111 @@ export function ProductDetailsScreen({
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(
     null,
   );
+  const [reviewData, setReviewData] = useState<ProductReviewsPage | null>(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewLoadingMore, setReviewLoadingMore] = useState(false);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewNotice, setReviewNotice] = useState('');
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewTitle, setReviewTitle] = useState('');
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewReload, setReviewReload] = useState(0);
+  const reviewGeneration = useRef(0);
+  const moreController = useRef<AbortController | null>(null);
+  const isLiveProduct = product.variantId !== undefined && /^[1-9]\d*$/.test(product.id);
+  const reviewProductId = isLiveProduct ? Number(product.id) : null;
+
+  useEffect(() => {
+    if (reviewProductId === null) return;
+    const generation = ++reviewGeneration.current;
+    const controller = new AbortController();
+    moreController.current?.abort();
+    setReviewData(null);
+    setReviewError('');
+    setReviewNotice('');
+    setReviewLoading(true);
+    setReviewLoadingMore(false);
+    customerShoppingApi.getProductReviews(
+      reviewProductId, 1, 10, controller.signal, isLoggedIn,
+    ).then(page => {
+      if (generation !== reviewGeneration.current) return;
+      setReviewData(page);
+      setReviewRating(page.mine?.rating ?? 5);
+      setReviewTitle(page.mine?.title ?? '');
+      setReviewComment(page.mine?.comment ?? '');
+    }).catch(error => {
+      if (generation !== reviewGeneration.current || controller.signal.aborted) return;
+      setReviewError(reviewErrorMessage(error));
+    }).finally(() => {
+      if (generation === reviewGeneration.current) setReviewLoading(false);
+    });
+    return () => {
+      reviewGeneration.current += 1;
+      controller.abort();
+      moreController.current?.abort();
+    };
+  }, [reviewProductId, isLoggedIn, reviewReload]);
+
+  const loadMoreReviews = async () => {
+    if (
+      reviewProductId === null ||
+      !reviewData ||
+      reviewLoadingMore ||
+      reviewData.items.length >= reviewData.total
+    ) return;
+    const generation = reviewGeneration.current;
+    const controller = new AbortController();
+    moreController.current = controller;
+    setReviewLoadingMore(true);
+    setReviewError('');
+    try {
+      const next = await customerShoppingApi.getProductReviews(
+        reviewProductId, reviewData.page + 1, 10, controller.signal, isLoggedIn,
+      );
+      if (generation !== reviewGeneration.current) return;
+      setReviewData(current => current && current.page < next.page
+        ? { ...next, items: [...current.items, ...next.items] }
+        : current);
+    } catch (error) {
+      if (!controller.signal.aborted && generation === reviewGeneration.current) {
+        setReviewError(reviewErrorMessage(error));
+      }
+    } finally {
+      if (generation === reviewGeneration.current) setReviewLoadingMore(false);
+    }
+  };
+
+  const submitReview = async () => {
+    if (
+      reviewProductId === null ||
+      !isLoggedIn ||
+      !reviewData?.canReview ||
+      reviewSubmitting
+    ) return;
+    const generation = reviewGeneration.current;
+    moreController.current?.abort();
+    setReviewSubmitting(true);
+    setReviewError('');
+    setReviewNotice('');
+    try {
+      const message = await customerShoppingApi.saveProductReview(reviewProductId, {
+        rating: reviewRating,
+        title: reviewTitle.trim() || null,
+        comment: reviewComment.trim() || null,
+      });
+      if (generation !== reviewGeneration.current) return;
+      setReviewNotice(message || 'Đã lưu đánh giá của bạn.');
+      const updated = await customerShoppingApi.getProductReviews(
+        reviewProductId, 1, 10, undefined, isLoggedIn,
+      );
+      if (generation === reviewGeneration.current) setReviewData(updated);
+    } catch (error) {
+      if (generation === reviewGeneration.current) setReviewError(reviewErrorMessage(error));
+    } finally {
+      if (generation === reviewGeneration.current) setReviewSubmitting(false);
+    }
+  };
   const variants = product.variants ?? [];
   const selectedVariant =
     variants.find(item => item.id === selectedVariantId) ??
@@ -325,6 +451,7 @@ export function ProductDetailsScreen({
       />
       <ScrollView
         contentContainerStyle={styles.detailsContent}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.detailsImageWrap}>
@@ -363,9 +490,12 @@ export function ProductDetailsScreen({
           <Text style={styles.detailsStore}>{product.store}</Text>
           <Text style={styles.detailsName}>{product.name}</Text>
           <View style={styles.detailsRatingRow}>
-            <Text style={styles.detailsStars}>★★★★★</Text>
+            <Text style={styles.detailsStars}>
+              {reviewStars(reviewData?.average ?? product.rating)}
+            </Text>
             <Text style={styles.detailsRating}>
-              {product.rating} · {product.reviews} lượt đánh giá
+              {(reviewData?.average ?? product.rating).toFixed(1)} ·{' '}
+              {reviewData?.total ?? product.reviews} lượt đánh giá
             </Text>
           </View>
           <View style={styles.detailsPriceRow}>
@@ -501,6 +631,144 @@ export function ProductDetailsScreen({
           >
             <Text style={styles.buyNowText}>Mua ngay →</Text>
           </Pressable>
+
+          {isLiveProduct ? (
+            <View style={styles.reviewsSection}>
+              <Text style={styles.detailsSectionTitle}>Đánh giá từ người mua</Text>
+              {reviewLoading ? (
+                <ActivityIndicator
+                  accessibilityLabel="Đang tải đánh giá"
+                  color={COLORS.teal}
+                  style={styles.reviewsLoader}
+                />
+              ) : null}
+              {reviewError ? (
+                <View style={styles.reviewMessage}>
+                  <Text accessibilityLiveRegion="polite" style={styles.reviewError}>
+                    {reviewError}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setReviewReload(value => value + 1)}
+                    style={styles.reviewRetry}
+                  >
+                    <Text style={styles.reviewRetryText}>Tải lại đánh giá</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+              {reviewNotice ? (
+                <Text accessibilityLiveRegion="polite" style={styles.reviewNotice}>
+                  {reviewNotice}
+                </Text>
+              ) : null}
+              {reviewData ? (
+                <>
+                  <Text style={styles.reviewsSummary}>
+                    {reviewData.total > 0
+                      ? `${reviewData.average.toFixed(1)}/5 · ${reviewData.total} đánh giá đã duyệt`
+                      : 'Chưa có đánh giá nào cho sản phẩm này.'}
+                  </Text>
+                  {reviewData.items.map(review => (
+                    <View key={review.id} style={styles.reviewCard}>
+                      <View style={styles.reviewCardHeader}>
+                        <Text style={styles.reviewAuthor}>{review.author}</Text>
+                        <Text style={styles.reviewDate}>{reviewDate(review.createdAt)}</Text>
+                      </View>
+                      <Text style={styles.reviewStars}>{reviewStars(review.rating)}</Text>
+                      {review.verifiedPurchase ? (
+                        <Text style={styles.verifiedReview}>Đã mua và nhận hàng</Text>
+                      ) : null}
+                      {review.title ? (
+                        <Text style={styles.reviewTitle}>{review.title}</Text>
+                      ) : null}
+                      {review.comment ? (
+                        <Text style={styles.reviewComment}>{review.comment}</Text>
+                      ) : null}
+                    </View>
+                  ))}
+                  {reviewData.items.length < reviewData.total ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={reviewLoadingMore}
+                      onPress={loadMoreReviews}
+                      style={styles.reviewMore}
+                    >
+                      <Text style={styles.reviewMoreText}>
+                        {reviewLoadingMore ? 'Đang tải...' : 'Xem thêm đánh giá'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                  <View style={styles.reviewForm}>
+                    <Text style={styles.reviewFormTitle}>
+                      {reviewData.mine ? 'Chỉnh sửa đánh giá của bạn' : 'Viết đánh giá'}
+                    </Text>
+                    {!isLoggedIn ? (
+                      <Text style={styles.reviewHelp}>
+                        Đăng nhập để đánh giá sản phẩm sau khi đơn hàng đã được giao.
+                      </Text>
+                    ) : !reviewData.canReview ? (
+                      <Text style={styles.reviewHelp}>
+                        Bạn có thể đánh giá sau khi đã mua và nhận sản phẩm này.
+                      </Text>
+                    ) : (
+                      <>
+                        <View style={styles.reviewRatingPicker}>
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <Pressable
+                              key={star}
+                              accessibilityLabel={`${star} sao`}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected: reviewRating === star }}
+                              onPress={() => setReviewRating(star)}
+                              style={styles.reviewStarButton}
+                            >
+                              <Text style={styles.reviewStarText}>
+                                {star <= reviewRating ? '★' : '☆'}
+                              </Text>
+                            </Pressable>
+                          ))}
+                        </View>
+                        <TextInput
+                          accessibilityLabel="Tiêu đề đánh giá"
+                          maxLength={180}
+                          onChangeText={setReviewTitle}
+                          placeholder="Tiêu đề (không bắt buộc)"
+                          placeholderTextColor={COLORS.muted}
+                          style={styles.reviewInput}
+                          value={reviewTitle}
+                        />
+                        <TextInput
+                          accessibilityLabel="Nội dung đánh giá"
+                          maxLength={2000}
+                          multiline
+                          onChangeText={setReviewComment}
+                          placeholder="Chia sẻ trải nghiệm của bạn (không bắt buộc)"
+                          placeholderTextColor={COLORS.muted}
+                          style={[styles.reviewInput, styles.reviewCommentInput]}
+                          textAlignVertical="top"
+                          value={reviewComment}
+                        />
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityState={{ disabled: reviewSubmitting }}
+                          disabled={reviewSubmitting}
+                          onPress={submitReview}
+                          style={[
+                            styles.reviewSubmit,
+                            reviewSubmitting && styles.purchaseDisabled,
+                          ]}
+                        >
+                          <Text style={styles.reviewSubmitText}>
+                            {reviewSubmitting ? 'Đang lưu...' : 'Gửi đánh giá'}
+                          </Text>
+                        </Pressable>
+                      </>
+                    )}
+                  </View>
+                </>
+              ) : null}
+            </View>
+          ) : null}
 
           {related.length ? (
             <>
@@ -775,4 +1043,85 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   relatedList: { gap: 12, paddingBottom: 5 },
+  reviewsSection: {
+    marginTop: 30,
+    paddingTop: 22,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  reviewsLoader: { marginTop: 20 },
+  reviewsSummary: { color: COLORS.muted, fontSize: 13, marginTop: 8 },
+  reviewMessage: { marginTop: 12, gap: 8 },
+  reviewError: { color: COLORS.red, fontSize: 13, lineHeight: 19 },
+  reviewNotice: {
+    color: COLORS.success,
+    fontSize: 13,
+    lineHeight: 19,
+    marginTop: 12,
+  },
+  reviewRetry: { alignSelf: 'flex-start', paddingVertical: 7 },
+  reviewRetryText: { color: COLORS.teal, fontWeight: '800' },
+  reviewCard: {
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    paddingVertical: 16,
+  },
+  reviewCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  reviewAuthor: { flex: 1, color: COLORS.ink, fontWeight: '800', fontSize: 14 },
+  reviewDate: { color: COLORS.muted, fontSize: 11 },
+  reviewStars: { color: COLORS.yellow, fontSize: 15, marginTop: 7 },
+  verifiedReview: { color: COLORS.success, fontSize: 11, marginTop: 5 },
+  reviewTitle: { color: COLORS.ink, fontSize: 14, fontWeight: '800', marginTop: 8 },
+  reviewComment: { color: COLORS.muted, fontSize: 13, lineHeight: 20, marginTop: 5 },
+  reviewMore: {
+    alignSelf: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  reviewMoreText: { color: COLORS.teal, fontWeight: '800', fontSize: 13 },
+  reviewForm: {
+    marginTop: 20,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: COLORS.surface,
+  },
+  reviewFormTitle: { color: COLORS.ink, fontSize: 16, fontWeight: '900' },
+  reviewHelp: { color: COLORS.muted, fontSize: 13, lineHeight: 20, marginTop: 8 },
+  reviewRatingPicker: { flexDirection: 'row', gap: 4, marginTop: 12 },
+  reviewStarButton: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewStarText: { color: COLORS.yellow, fontSize: 29 },
+  reviewInput: {
+    minHeight: 46,
+    marginTop: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    color: COLORS.ink,
+    fontSize: 13,
+  },
+  reviewCommentInput: { minHeight: 96 },
+  reviewSubmit: {
+    minHeight: 46,
+    marginTop: 14,
+    borderRadius: 23,
+    backgroundColor: COLORS.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewSubmitText: { color: COLORS.white, fontSize: 13, fontWeight: '900' },
 });

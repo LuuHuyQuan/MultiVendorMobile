@@ -81,7 +81,7 @@ export default function SellerPortalScreen({ topInset, onBack }: Props) {
     } catch (cause) {
       setError(
         cause instanceof ApiError && cause.status === 404
-          ? 'Tài khoản chưa có cửa hàng đang hoạt động. Bạn có thể lưu thông tin cửa hàng dự kiến trong mục Các cửa hàng.'
+          ? 'Tài khoản chưa có cửa hàng đang hoạt động. Bạn có thể gửi hồ sơ trong mục Các cửa hàng.'
           : messageFor(cause),
       );
     } finally {

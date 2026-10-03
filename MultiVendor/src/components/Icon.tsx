@@ -20,6 +20,7 @@ const paths = {
   plus: 'M12 5v14M5 12h14',
   minus: 'M5 12h14',
   trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7',
+  edit: 'M4 20h4l11-11-4-4L4 16v4Zm9-13 4 4M15 5l2-2a2 2 0 0 1 3 3l-2 2',
   'arrow-right': 'M4 12h16m-6-6 6 6-6 6',
   'arrow-up-right': 'M6 18 18 6M6 6h12v12',
   sort: 'M8 3v18m-4-4 4 4 4-4M16 21V3m-4 4 4-4 4 4',

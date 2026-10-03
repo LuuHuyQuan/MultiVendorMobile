@@ -9,11 +9,14 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 
 import { EmptyState, ScreenHeader, sharedStyles } from '../components/SellzyUI';
+import { CartPromotions } from '../components/CartPromotions';
 import { products } from '../data/catalog';
+import { baseProductId } from '../data/liveCatalog';
 import {
   calculateTotals,
   FREE_SHIPPING_THRESHOLD,
@@ -32,7 +35,7 @@ import {
 type DisplayTotals = Pick<
   ReturnType<typeof calculateTotals>,
   'subtotal' | 'discount' | 'shipping' | 'total'
->;
+> & { tax?: number };
 
 type CartProps = {
   topInset: number;
@@ -43,11 +46,18 @@ type CartProps = {
   totalsOverride?: DisplayTotals;
   onApplyCoupon: (code: string) => boolean;
   onBack: () => void;
+  onHome: () => void;
   onShop: () => void;
+  onSellers: () => void;
+  onHelp: () => void;
   onCheckout: () => void;
   onOpenProduct: (id: string) => void;
+  onAddProduct: (id: string) => void;
   onSetQuantity: (id: string, quantity: number) => void;
   onRemove: (id: string) => void;
+  onClear: () => void;
+  wishlistIds: string[];
+  onToggleWishlist: (id: string) => void;
 };
 
 const cartProducts = (cart: CartQuantities, catalogProducts: Product[]) =>
@@ -84,173 +94,300 @@ export function CartScreen({
   totalsOverride,
   onApplyCoupon,
   onBack,
+  onHome,
   onShop,
+  onSellers,
+  onHelp,
   onCheckout,
   onOpenProduct,
+  onAddProduct,
   onSetQuantity,
   onRemove,
+  onClear,
+  wishlistIds,
+  onToggleWishlist,
 }: CartProps) {
+  const { width } = useWindowDimensions();
+  const wide = width >= 1200;
   const [coupon, setCoupon] = useState(couponCode);
   const [couponError, setCouponError] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const couponApplied = !!couponCode;
   const lines = cartProducts(cart, catalogProducts);
-  const { subtotal, discount, shipping, total } = screenTotals(
+  const { subtotal, discount, shipping, tax = 0, total } = screenTotals(
     cart,
     couponCode,
     catalogProducts,
     liveCatalog,
     totalsOverride,
   );
-  const remainingForFreeShipping = Math.max(
-    0,
-    FREE_SHIPPING_THRESHOLD - subtotal,
-  );
+  const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD - subtotal);
 
   return (
     <View style={[sharedStyles.screen, { paddingTop: topInset }]}>
-      <ScreenHeader
-        canGoBack
-        onBack={onBack}
-        subtitle={`${lines.length} sản phẩm khác nhau`}
-        title="Giỏ hàng"
-      />
-      {!lines.length ? (
-        <EmptyState
-          actionLabel="Mua sắm ngay"
-          icon="▱"
-          message="Giỏ hàng đang chờ sản phẩm phù hợp. Khám phá ưu đãi sức khỏe hôm nay nhé."
-          onAction={onShop}
-          title="Giỏ hàng đang trống"
-        />
-      ) : (
-        <>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.cartContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {lines.map(product => (
-              <CartLine
-                key={product.id}
-                onOpen={() => onOpenProduct(product.id)}
-                onRemove={() => onRemove(product.id)}
-                onSetQuantity={quantity => onSetQuantity(product.id, quantity)}
-                product={product}
-                quantity={cart[product.id]}
-              />
-            ))}
-
-            {!liveCatalog ? (
-              <View style={styles.shippingNotice}>
-                <View style={styles.shippingNoticeIcon}>
-                  <Icon color={COLORS.teal} name="truck" size={19} />
-                </View>
-                <Text style={styles.shippingNoticeText}>
-                  {remainingForFreeShipping > 0 ? (
-                    <>
-                      Mua thêm{' '}
-                      <Text style={styles.shippingNoticeStrong}>
-                        {money(remainingForFreeShipping)}
-                      </Text>{' '}
-                      để được miễn phí vận chuyển.
-                    </>
-                  ) : (
-                    <Text style={styles.shippingNoticeStrong}>
-                      Đơn hàng của bạn đã đủ điều kiện miễn phí vận chuyển.
-                    </Text>
-                  )}
-                </Text>
+      {wide ? (
+        <View style={styles.cartDesktopNav}>
+          <View style={styles.cartDesktopNavInner}>
+            <Pressable accessibilityRole="button" onPress={onShop} style={styles.cartExploreButton}>
+              <Icon name="shop" size={19} color={COLORS.white} />
+              <Text style={styles.cartExploreText}>Explore All Categories</Text>
+              <Icon name="chevron-right" size={17} color={COLORS.white} />
+            </Pressable>
+            <View style={styles.cartNavLinks}>
+              <Pressable accessibilityRole="button" onPress={onHome} style={styles.cartNavLink}>
+                <Text style={styles.cartNavText}>Home</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={onShop} style={styles.cartNavLink}>
+                <Text style={[styles.cartNavText, styles.cartNavActive]}>Shop</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={onSellers} style={styles.cartNavLink}>
+                <Text style={styles.cartNavText}>Sellers</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={onHelp} style={styles.cartNavLink}>
+                <Text style={styles.cartNavText}>Contact</Text>
+              </Pressable>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onHelp} style={styles.cartNavSupport}>
+              <Icon name="headset" size={23} color={COLORS.ink} />
+              <View>
+                <Text style={styles.cartNavSupportCaption}>Need help?</Text>
+                <Text style={styles.cartNavSupportLabel}>Support</Text>
               </View>
-            ) : null}
-
-            {!liveCatalog ? (
-              <>
-                <Text style={styles.cardHeading}>Bạn có mã ưu đãi?</Text>
-                <View style={styles.couponRow}>
-                  <TextInput
-                    testID="coupon-input"
-                    accessibilityLabel="Mã ưu đãi"
-                    autoCapitalize="characters"
-                    onChangeText={value => {
-                      setCoupon(value);
-                      setCouponError(false);
-                    }}
-                    placeholder="Nhập SELLZY10"
-                    placeholderTextColor="#98A1A6"
-                    style={styles.couponInput}
-                    value={coupon}
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Áp dụng mã ưu đãi"
-                    onPress={() => setCouponError(!onApplyCoupon(coupon))}
-                    style={styles.couponButton}
-                  >
-                    <Text style={styles.couponButtonText}>Áp dụng</Text>
-                  </Pressable>
-                </View>
-                {couponError ? (
-                  <Text style={[styles.couponMessage, styles.couponError]}>
-                    Mã ưu đãi không hợp lệ. Hãy thử SELLZY10.
-                  </Text>
-                ) : null}
-                {couponApplied ? (
-                  <Text style={[styles.couponMessage, styles.couponSuccess]}>
-                    {`Đã áp dụng ${couponCode} — bạn tiết kiệm ${money(
-                      discount,
-                    )}!`}
-                  </Text>
-                ) : null}
-                {couponApplied ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => {
-                      onApplyCoupon('');
-                      setCoupon('');
-                      setCouponError(false);
-                    }}
-                  >
-                    <Text style={styles.removeCoupon}>Xóa mã ưu đãi</Text>
-                  </Pressable>
-                ) : null}
-              </>
-            ) : null}
-
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>Tóm tắt đơn hàng</Text>
-              <SummaryRow label="Tạm tính" value={money(subtotal)} />
-              {!liveCatalog || discount > 0 ? (
-                <SummaryRow
-                  label="Giảm giá"
-                  positive
-                  value={discount ? `−${money(discount)}` : money(0)}
-                />
-              ) : null}
-              <SummaryRow
-                label="Vận chuyển"
-                positive={shipping === 0}
-                value={shipping === 0 ? 'MIỄN PHÍ' : money(shipping)}
-              />
-              <View style={styles.summaryDivider} />
-              <SummaryRow bold label="Tổng cộng" value={money(total)} />
-            </View>
-          </ScrollView>
-          <View style={styles.stickyFooter}>
-            <View>
-              <Text style={styles.footerLabel}>Tổng cộng</Text>
-              <Text style={styles.footerTotal}>{money(total)}</Text>
-            </View>
-            <Pressable
-              testID="cart-checkout"
-              accessibilityRole="button"
-              onPress={onCheckout}
-              style={styles.checkoutButton}
-            >
-              <Text style={styles.checkoutButtonText}>Thanh toán →</Text>
             </Pressable>
           </View>
-        </>
-      )}
+        </View>
+      ) : null}
+      {!wide ? (
+        <ScreenHeader
+          canGoBack
+          onBack={onBack}
+          subtitle={lines.length + ' sản phẩm khác nhau'}
+          title="Giỏ hàng"
+        />
+      ) : null}
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[styles.cartContent, wide && styles.cartContentWide]}
+        showsVerticalScrollIndicator={false}
+      >
+        {wide ? (
+          <View style={styles.cartBreadcrumb}>
+            <Pressable accessibilityRole="button" onPress={onHome} style={styles.cartBreadcrumbLink}>
+              <Icon name="home" size={19} color={COLORS.ink} />
+              <Text style={styles.cartBreadcrumbText}>Home</Text>
+            </Pressable>
+            <Text style={styles.cartBreadcrumbDot}>•</Text>
+            <Text style={styles.cartBreadcrumbCurrent}>Cart</Text>
+          </View>
+        ) : null}
+        {wide || lines.length ? (
+          <View style={[styles.cartHeadingRow, !wide && styles.cartHeadingRowMobile]}>
+            {wide ? (
+              <Text style={styles.cartHeadingTitle}>Cart <Text style={styles.cartHeadingCount}>({lines.length} {lines.length === 1 ? 'item' : 'items'})</Text></Text>
+            ) : (
+              <Text style={styles.cartHeadingTitle}>Sản phẩm trong giỏ</Text>
+            )}
+            {lines.length ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Xóa tất cả sản phẩm khỏi giỏ hàng"
+                onPress={onClear}
+                style={styles.cartClearButton}
+              >
+                <Icon name="close" size={18} color={COLORS.red} />
+                <Text style={styles.cartClearText}>{wide ? 'Remove All' : 'Xóa tất cả'}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+        {!lines.length ? (
+          <EmptyState
+            actionLabel="Mua sắm ngay"
+            icon="▱"
+            message="Giỏ hàng đang chờ sản phẩm phù hợp. Khám phá ưu đãi sức khỏe hôm nay nhé."
+            onAction={onShop}
+            title="Giỏ hàng đang trống"
+          />
+        ) : (
+          <View style={[styles.cartColumns, wide && styles.cartColumnsWide]}>
+            <View style={[styles.cartTable, wide && styles.cartTableWide]}>
+              {wide ? (
+                <View style={styles.cartTableHeader}>
+                  <Text style={[styles.cartTableHeaderLabel, styles.cartProductCell]}>Product</Text>
+                  <Text style={[styles.cartTableHeaderLabel, styles.cartPriceCell]}>Price</Text>
+                  <Text style={[styles.cartTableHeaderLabel, styles.cartQuantityCell]}>Quantity</Text>
+                  <Text style={[styles.cartTableHeaderLabel, styles.cartTotalCell]}>Total Price</Text>
+                  <Text style={[styles.cartTableHeaderLabel, styles.cartActionCell]}>Action</Text>
+                </View>
+              ) : null}
+              {lines.map(product => (
+                <CartLine
+                  key={product.id}
+                  wide={wide}
+                  liked={wishlistIds.includes(baseProductId(product.id))}
+                  onToggleWishlist={() => onToggleWishlist(baseProductId(product.id))}
+                  onOpen={() => onOpenProduct(product.id)}
+                  onRemove={() => onRemove(product.id)}
+                  onSetQuantity={quantity => onSetQuantity(product.id, quantity)}
+                  product={product}
+                  quantity={cart[product.id]}
+                />
+              ))}
+            </View>
+
+            <View style={[styles.cartAside, wide && styles.cartAsideWide]}>
+              {!liveCatalog ? (
+                <View style={styles.shippingNotice}>
+                  <Icon color={COLORS.teal} name="truck" size={21} />
+                  <Text style={styles.shippingNoticeText}>
+                    {remainingForFreeShipping > 0 ? (
+                      <>
+                        {wide ? 'Spend ' : 'Mua thêm '}
+                        <Text style={styles.shippingNoticeStrong}>{money(remainingForFreeShipping)}</Text>
+                        {wide ? ' for Free Shipping' : ' để được miễn phí vận chuyển.'}
+                      </>
+                    ) : (
+                      <Text style={styles.shippingNoticeStrong}>
+                        {wide ? 'Your order qualifies for Free Shipping' : 'Đơn hàng đã đủ điều kiện miễn phí vận chuyển.'}
+                      </Text>
+                    )}
+                  </Text>
+                </View>
+              ) : null}
+              <View style={[styles.summaryCard, styles.cartSummaryCard]}>
+                <Text style={[styles.summaryTitle, styles.cartSummaryTitle]}>
+                  {wide ? 'Order Summary' : 'Tóm tắt đơn hàng'}
+                </Text>
+                {!liveCatalog ? (
+                  <>
+                    <View style={styles.couponRow}>
+                      <TextInput
+                        accessibilityLabel="Mã ưu đãi"
+                        autoCapitalize="characters"
+                        onChangeText={value => {
+                          setCoupon(value);
+                          setCouponError(false);
+                        }}
+                        placeholder={wide ? 'Coupon Code' : 'Nhập SELLZY10'}
+                        placeholderTextColor="#98A1A6"
+                        style={styles.couponInput}
+                        value={coupon}
+                      />
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Áp dụng mã ưu đãi"
+                        onPress={() => setCouponError(!onApplyCoupon(coupon))}
+                        style={styles.couponButton}
+                      >
+                        <Text style={styles.couponButtonText}>{wide ? 'Apply' : 'Áp dụng'}</Text>
+                      </Pressable>
+                    </View>
+                    {couponError ? (
+                      <Text style={[styles.couponMessage, styles.couponError]}>
+                        Mã ưu đãi không hợp lệ. Hãy thử SELLZY10.
+                      </Text>
+                    ) : null}
+                    {couponApplied ? (
+                      <View style={styles.cartCouponApplied}>
+                        <Text style={[styles.couponMessage, styles.couponSuccess]}>
+                          Đã áp dụng {couponCode} · tiết kiệm {money(discount)}
+                        </Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Xóa mã ưu đãi"
+                          onPress={() => {
+                            onApplyCoupon('');
+                            setCoupon('');
+                            setCouponError(false);
+                          }}
+                        >
+                          <Text style={styles.removeCoupon}>Xóa</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                  </>
+                ) : null}
+                <SummaryRow label={wide ? 'Sub-Total' : 'Tạm tính'} value={money(subtotal)} />
+                {discount > 0 ? (
+                  <SummaryRow label={wide ? 'Discount' : 'Giảm giá'} positive value={'−' + money(discount)} />
+                ) : null}
+                {!liveCatalog ? (
+                  <SummaryRow
+                    label={wide ? 'Shipping' : 'Vận chuyển'}
+                    positive={shipping === 0}
+                    value={shipping === 0 ? (wide ? 'Free' : 'MIỄN PHÍ') : money(shipping)}
+                  />
+                ) : totalsOverride && shipping > 0 ? (
+                  <SummaryRow label={wide ? 'Shipping' : 'Vận chuyển'} value={money(shipping)} />
+                ) : null}
+                {tax > 0 ? <SummaryRow label={wide ? 'Tax' : 'Thuế'} value={money(tax)} /> : null}
+                {liveCatalog && !totalsOverride ? (
+                  <Text style={styles.cartEstimateNote}>
+                    Phí giao hàng và thuế sẽ được xác nhận khi thanh toán.
+                  </Text>
+                ) : null}
+                <View style={styles.summaryDivider} />
+                <SummaryRow
+                  bold
+                  label={liveCatalog && !totalsOverride ? (wide ? 'Estimated subtotal' : 'Tạm tính') : (wide ? 'Total' : 'Tổng cộng')}
+                  value={money(total)}
+                />
+              </View>
+              {wide ? (
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: confirmed }}
+                  onPress={() => setConfirmed(value => !value)}
+                  style={styles.cartTermsRow}
+                >
+                  <View style={[styles.cartCheckbox, confirmed && styles.cartCheckboxChecked]}>
+                    {confirmed ? <Icon name="check" size={14} color={COLORS.white} /> : null}
+                  </View>
+                  <Text style={styles.cartTermsText}>I have checked my cart and agree to continue to checkout</Text>
+                </Pressable>
+              ) : null}
+              {wide ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !confirmed }}
+                  disabled={!confirmed}
+                  onPress={onCheckout}
+                  style={[styles.cartAsideCheckout, !confirmed && styles.cartAsideCheckoutDisabled]}
+                >
+                  <Text style={styles.cartAsideCheckoutText}>Proceed to checkout</Text>
+                </Pressable>
+              ) : null}
+              <Pressable accessibilityRole="button" onPress={onShop} style={styles.cartContinueButton}>
+                <Text style={styles.cartContinueText}>{wide ? 'Continue Shopping' : 'Tiếp tục mua sắm'}</Text>
+                <Icon name="arrow-right" size={18} color={COLORS.ink} />
+              </Pressable>
+            </View>
+          </View>
+        )}
+        {lines.length ? (
+          <View style={[styles.cartPromotionsWrap, wide && styles.cartPromotionsWrapWide]}>
+            <CartPromotions
+              products={catalogProducts.filter(product => product.id === baseProductId(product.id))}
+              liveCatalog={liveCatalog}
+              wishlistIds={wishlistIds}
+              onOpenProduct={onOpenProduct}
+              onAdd={onAddProduct}
+              onToggleLike={onToggleWishlist}
+            />
+          </View>
+        ) : null}
+      </ScrollView>
+      {!wide && lines.length ? (
+        <View style={styles.stickyFooter}>
+          <View>
+            <Text style={styles.footerLabel}>{liveCatalog ? 'Tạm tính' : 'Tổng cộng'}</Text>
+            <Text style={styles.footerTotal}>{money(total)}</Text>
+          </View>
+          <Pressable accessibilityRole="button" onPress={onCheckout} style={styles.checkoutButton}>
+            <Text style={styles.checkoutButtonText}>Thanh toán →</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -258,78 +395,130 @@ export function CartScreen({
 function CartLine({
   product,
   quantity,
+  wide,
+  liked,
+  onToggleWishlist,
   onOpen,
   onRemove,
   onSetQuantity,
 }: {
   product: Product;
   quantity: number;
+  wide: boolean;
+  liked: boolean;
+  onToggleWishlist?: () => void;
   onOpen: () => void;
   onRemove: () => void;
   onSetQuantity: (quantity: number) => void;
 }) {
-  return (
-    <View style={styles.cartLine}>
+  const price = unitPrice(product, quantity);
+  const oldPrice = product.oldPrice > price ? product.oldPrice : undefined;
+  const chosenVariant = product.variants?.find(variant => variant.id === product.variantId);
+  const variantName = chosenVariant?.name;
+  const filledStars = Math.max(0, Math.min(5, Math.round(product.rating)));
+  const quantityControl = (
+    <View style={styles.miniQuantity}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Xem ${product.name}`}
-        onPress={onOpen}
-        style={styles.cartImageWrap}
+        accessibilityLabel={'Giảm số lượng ' + product.name}
+        disabled={quantity <= 1}
+        onPress={() => onSetQuantity(Math.max(1, quantity - 1))}
+        style={styles.miniQuantityButton}
       >
-        <Image
-          source={product.image}
-          resizeMode="contain"
-          style={styles.cartImage}
-        />
+        <Icon name="minus" size={16} color={quantity <= 1 ? COLORS.muted : COLORS.ink} />
       </Pressable>
-      <View style={styles.cartLineBody}>
-        <Text style={styles.cartStore}>{product.store}</Text>
-        <Text numberOfLines={2} style={styles.cartName}>
-          {product.name}
-        </Text>
-        <Text style={styles.cartPrice}>{money(unitPrice(product, quantity))}</Text>
-        <View style={styles.cartLineActions}>
-          <View style={styles.miniQuantity}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Giảm số lượng ${product.name}`}
-              disabled={quantity <= 1}
-              onPress={() => onSetQuantity(Math.max(1, quantity - 1))}
-              style={styles.miniQuantityButton}
-            >
-              <Icon
-                name="minus"
-                size={16}
-                color={quantity <= 1 ? COLORS.muted : COLORS.teal}
-              />
-            </Pressable>
-            <Text style={styles.miniQuantityValue}>{quantity}</Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Tăng số lượng ${product.name}`}
-              disabled={quantity >= product.stock}
-              onPress={() =>
-                onSetQuantity(Math.min(product.stock, quantity + 1))
-              }
-              style={styles.miniQuantityButton}
-            >
-              <Icon
-                name="plus"
-                size={16}
-                color={quantity >= product.stock ? COLORS.muted : COLORS.teal}
-              />
-            </Pressable>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={`Xóa ${product.name} khỏi giỏ hàng`}
-            onPress={onRemove}
-            style={styles.removeButton}
-          >
-            <Text style={styles.removeText}>Xóa</Text>
+      <Text style={styles.miniQuantityValue}>{quantity}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={'Tăng số lượng ' + product.name}
+        disabled={quantity >= product.stock}
+        onPress={() => onSetQuantity(Math.min(product.stock, quantity + 1))}
+        style={styles.miniQuantityButton}
+      >
+        <Icon name="plus" size={16} color={quantity >= product.stock ? COLORS.muted : COLORS.ink} />
+      </Pressable>
+    </View>
+  );
+  const actions = (
+    <View style={styles.cartRowActions}>
+      {onToggleWishlist ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={(liked ? 'Bỏ yêu thích ' : 'Yêu thích ') + product.name}
+          onPress={onToggleWishlist}
+          style={styles.cartIconButton}
+        >
+          <Icon name="heart" size={22} color={liked ? COLORS.red : COLORS.ink} filled={liked} />
+        </Pressable>
+      ) : null}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={'Xóa ' + product.name + ' khỏi giỏ hàng'}
+        onPress={onRemove}
+        style={styles.cartIconButton}
+      >
+        <Icon name="trash" size={21} color={COLORS.ink} />
+      </Pressable>
+    </View>
+  );
+  return (
+    <View style={[styles.cartLine, wide && styles.cartLineWide]}>
+      <View style={[styles.cartLineProduct, wide && styles.cartProductCell]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={'Xem ' + product.name}
+          onPress={onOpen}
+          style={[styles.cartImageWrap, wide && styles.cartImageWrapWide]}
+        >
+          <Image source={product.image} resizeMode="contain" style={styles.cartImage} />
+        </Pressable>
+        <View style={[styles.cartLineBody, wide && styles.cartLineBodyWide]}>
+          <Pressable accessibilityRole="button" onPress={onOpen}>
+            <Text numberOfLines={2} style={styles.cartName}>{product.name}</Text>
           </Pressable>
+          {variantName ? (
+            <Pressable accessibilityRole="button" onPress={onOpen} style={styles.cartVariantRow}>
+              <Text numberOfLines={1} style={styles.cartVariantText}>{variantName}</Text>
+              <Icon name="edit" size={15} color={COLORS.ink} />
+            </Pressable>
+          ) : (
+            <Text numberOfLines={1} style={styles.cartStore}>{product.store}</Text>
+          )}
+          <Text style={styles.cartStock}>Available: {Math.max(0, product.stock)}</Text>
+          {product.rating > 0 ? (
+            <Text style={styles.cartRating}>
+              <Text style={styles.cartRatingFilled}>{'★'.repeat(filledStars)}</Text>
+              <Text style={styles.cartRatingEmpty}>{'★'.repeat(5 - filledStars)}</Text>
+              <Text style={styles.cartRatingCount}> ({product.reviews})</Text>
+            </Text>
+          ) : null}
+          {!wide ? (
+            <View style={styles.cartMobilePriceRow}>
+              <Text style={styles.cartPrice}>{money(price)}</Text>
+              {oldPrice ? <Text style={styles.cartOldPrice}>{money(oldPrice)}</Text> : null}
+            </View>
+          ) : null}
         </View>
       </View>
+      {wide ? (
+        <>
+          <View style={styles.cartPriceCell}>
+            <Text style={styles.cartPrice}>{money(price)}</Text>
+            {oldPrice ? <Text style={styles.cartOldPrice}>{money(oldPrice)}</Text> : null}
+          </View>
+          <View style={styles.cartQuantityCell}>{quantityControl}</View>
+          <View style={styles.cartTotalCell}>
+            <Text style={styles.cartLineTotal}>{money(price * quantity)}</Text>
+          </View>
+          <View style={styles.cartActionCell}>{actions}</View>
+        </>
+      ) : (
+        <View style={styles.cartLineActions}>
+          {quantityControl}
+          <Text style={styles.cartLineTotal}>{money(price * quantity)}</Text>
+          {actions}
+        </View>
+      )}
     </View>
   );
 }
@@ -403,7 +592,7 @@ export function CheckoutScreen({
   const [submitError, setSubmitError] = useState('');
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const lines = cartProducts(cart, catalogProducts);
-  const { subtotal, discount, shipping, total } = screenTotals(
+  const { subtotal, discount, shipping, tax = 0, total } = screenTotals(
     cart,
     couponCode,
     catalogProducts,
@@ -567,6 +756,7 @@ export function CheckoutScreen({
                 cart={cart}
                 couponCode={liveCatalog ? '' : couponCode}
                 discount={discount}
+                tax={tax}
                 lines={lines}
                 shipping={shipping}
                 subtotal={subtotal}
@@ -803,6 +993,7 @@ export function CheckoutScreen({
                 cart={cart}
                 couponCode={liveCatalog ? '' : couponCode}
                 discount={discount}
+                tax={tax}
                 lines={lines}
                 shipping={shipping}
                 subtotal={subtotal}
@@ -879,6 +1070,7 @@ function CheckoutSummary({
   cart,
   couponCode,
   discount,
+  tax,
   lines,
   shipping,
   subtotal,
@@ -887,6 +1079,7 @@ function CheckoutSummary({
   cart: CartQuantities;
   couponCode: string;
   discount: number;
+  tax: number;
   lines: Product[];
   shipping: number;
   subtotal: number;
@@ -907,9 +1100,9 @@ function CheckoutSummary({
       ))}
       <View style={styles.summaryDivider} />
       <SummaryRow label="Tạm tính" value={money(subtotal)} />
-      {couponCode ? (
+      {discount > 0 ? (
         <SummaryRow
-          label={`Giảm giá (${couponCode})`}
+          label={couponCode ? `Giảm giá (${couponCode})` : 'Giảm giá'}
           positive
           value={`−${money(discount)}`}
         />
@@ -919,6 +1112,7 @@ function CheckoutSummary({
         positive={shipping === 0}
         value={shipping === 0 ? 'MIỄN PHÍ' : money(shipping)}
       />
+      {tax > 0 ? <SummaryRow label="Thuế" value={money(tax)} /> : null}
       <SummaryRow bold label="Tổng đơn hàng" value={money(total)} />
     </View>
   );
@@ -1048,21 +1242,181 @@ export function OrderSuccessScreen({
 }
 
 const styles = StyleSheet.create({
+  cartDesktopNav: {
+    width: '100%',
+    minHeight: 76,
+    borderBottomWidth: 1,
+    borderBottomColor: '#DDE4EA',
+    backgroundColor: COLORS.white,
+    justifyContent: 'center',
+  },
+  cartDesktopNavInner: {
+    width: '100%',
+    maxWidth: 1680,
+    paddingHorizontal: 24,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cartExploreButton: {
+    minHeight: 50,
+    paddingHorizontal: 20,
+    backgroundColor: COLORS.teal,
+    borderRadius: 7,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cartExploreText: { color: COLORS.white, fontSize: 15, fontWeight: '800' },
+  cartNavLinks: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cartNavLink: { paddingHorizontal: 15, minHeight: 48, justifyContent: 'center' },
+  cartNavText: { color: '#20272D', fontSize: 15, fontWeight: '700' },
+  cartNavActive: { color: COLORS.teal },
+  cartNavSupport: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48 },
+  cartNavSupportCaption: { color: COLORS.muted, fontSize: 12 },
+  cartNavSupportLabel: { color: COLORS.ink, fontSize: 16, marginTop: 2 },
+  cartContentWide: {
+    width: '100%',
+    maxWidth: 1680,
+    alignSelf: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 42,
+    paddingBottom: 80,
+  },
+  cartBreadcrumb: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginBottom: 42,
+  },
+  cartBreadcrumbLink: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cartBreadcrumbText: { color: COLORS.ink, fontSize: 15 },
+  cartBreadcrumbDot: { color: '#A3ADB5', fontSize: 14 },
+  cartBreadcrumbCurrent: { color: '#8B9AAA', fontSize: 15 },
+  cartHeadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 28,
+  },
+  cartHeadingRowMobile: { marginBottom: 16 },
+  cartHeadingTitle: { color: '#101C2A', fontSize: 21, fontWeight: '700' },
+  cartHeadingCount: { fontSize: 16, fontWeight: '400' },
+  cartClearButton: { flexDirection: 'row', alignItems: 'center', gap: 5, minHeight: 42 },
+  cartClearText: { color: COLORS.red, fontSize: 15, fontWeight: '700' },
+  cartColumns: { gap: 24 },
+  cartColumnsWide: { flexDirection: 'row', alignItems: 'flex-start' },
+  cartTable: { backgroundColor: COLORS.white },
+  cartTableWide: {
+    flex: 2,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: '#DDE4EA',
+    borderRadius: 17,
+    overflow: 'hidden',
+  },
+  cartTableHeader: {
+    height: 46,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F5F7',
+  },
+  cartTableHeaderLabel: { color: '#334256', fontSize: 15, fontWeight: '500' },
+  cartProductCell: { width: '46%' },
+  cartPriceCell: { width: '14%', alignItems: 'flex-start' },
+  cartQuantityCell: { width: '14%', alignItems: 'flex-start' },
+  cartTotalCell: { width: '16%', alignItems: 'flex-start' },
+  cartActionCell: { width: '10%', alignItems: 'center' },
+  cartLineWide: {
+    minHeight: 151,
+    marginBottom: 0,
+    padding: 16,
+    borderWidth: 0,
+    borderTopWidth: 1,
+    borderTopColor: '#DDE4EA',
+    borderRadius: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cartLineProduct: { flexDirection: 'row', alignItems: 'center' },
+  cartImageWrapWide: { width: 118, height: 118, borderRadius: 15 },
+  cartLineBodyWide: { minWidth: 0, paddingLeft: 16 },
+  cartVariantRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 9 },
+  cartVariantText: { color: '#3C526B', fontSize: 13, flexShrink: 1 },
+  cartStock: { color: '#3C526B', fontSize: 12, marginTop: 10 },
+  cartRating: { marginTop: 8, fontSize: 17, lineHeight: 20 },
+  cartRatingFilled: { color: '#FDBB0B' },
+  cartRatingEmpty: { color: '#C4CDD5' },
+  cartRatingCount: { color: '#3C526B', fontSize: 11 },
+  cartMobilePriceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 9 },
+  cartOldPrice: {
+    color: '#91A1B1',
+    fontSize: 13,
+    textDecorationLine: 'line-through',
+    marginTop: 4,
+  },
+  cartLineTotal: { color: '#101C2A', fontSize: 14, fontWeight: '700' },
+  cartRowActions: { flexDirection: 'row', alignItems: 'center', gap: 1 },
+  cartIconButton: { width: 34, height: 44, alignItems: 'center', justifyContent: 'center' },
+  cartAside: { gap: 18 },
+  cartAsideWide: {
+    flex: 1,
+    minWidth: 300,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: '#DDE4EA',
+    borderRadius: 17,
+  },
+  cartSummaryCard: {
+    marginTop: 0,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#DDE4EA',
+    borderRadius: 16,
+    backgroundColor: COLORS.white,
+  },
+  cartSummaryTitle: { fontSize: 20, marginBottom: 23 },
+  cartCouponApplied: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cartEstimateNote: { color: COLORS.muted, fontSize: 12, lineHeight: 18, marginTop: 10 },
+  cartTermsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 48 },
+  cartCheckbox: { width: 20, height: 20, borderWidth: 2, borderColor: '#D5DEE5', borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
+  cartCheckboxChecked: { backgroundColor: COLORS.teal, borderColor: COLORS.teal },
+  cartTermsText: { color: '#34485D', fontSize: 13, flex: 1, lineHeight: 19 },
+  cartAsideCheckout: {
+    height: 50,
+    borderRadius: 26,
+    backgroundColor: COLORS.teal,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cartAsideCheckoutDisabled: { opacity: 0.55 },
+  cartAsideCheckoutText: { color: COLORS.white, fontSize: 15, fontWeight: '800' },
+  cartContinueButton: {
+    height: 49,
+    borderWidth: 1,
+    borderColor: '#D6DFE6',
+    borderRadius: 26,
+    backgroundColor: COLORS.white,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+  },
+  cartContinueText: { color: '#101C2A', fontSize: 14, fontWeight: '700' },
+  cartPromotionsWrap: { marginTop: 42 },
+  cartPromotionsWrapWide: { marginTop: 72 },
   removeCoupon: {
     color: COLORS.teal,
     fontWeight: '700',
     fontSize: 12,
     paddingVertical: 14,
   },
-  removeButton: {
-    paddingHorizontal: 8,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
   pressed: { opacity: 0.72 },
-  cartContent: { padding: 16, paddingBottom: 30 },
+  cartContent: { padding: 16, paddingBottom: 30, width: '100%' },
   cartLine: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     padding: 12,
     marginBottom: 12,
     borderRadius: 18,
@@ -1079,27 +1433,26 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
   },
   cartImage: { width: '90%', height: '90%' },
-  cartLineBody: { flex: 1, paddingLeft: 13 },
-  cartStore: { color: COLORS.teal, fontSize: 11, fontWeight: '900' },
+  cartLineBody: { flex: 1, paddingLeft: 13, minWidth: 0 },
+  cartStore: { color: '#3C526B', fontSize: 12, marginTop: 9 },
   cartName: {
     color: COLORS.ink,
     fontSize: 14,
     lineHeight: 20,
     fontWeight: '800',
-    marginTop: 4,
+    marginTop: 0,
   },
   cartPrice: {
     color: COLORS.ink,
-    fontSize: 16,
-    fontWeight: '900',
-    marginTop: 7,
+    fontSize: 14,
+    fontWeight: '700',
   },
   cartLineActions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 9,
+    marginTop: 12,
   },
   miniQuantity: {
     height: 44,
@@ -1115,7 +1468,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  miniQuantityText: { color: COLORS.teal, fontSize: 15, fontWeight: '900' },
   miniQuantityValue: {
     minWidth: 20,
     textAlign: 'center',
@@ -1123,38 +1475,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
   },
-  removeText: { color: COLORS.red, fontSize: 12, fontWeight: '800' },
   shippingNotice: {
-    padding: 14,
-    marginTop: 2,
-    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 28,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.tealSoft,
-  },
-  shippingNoticeIcon: {
-    width: 35,
-    height: 35,
-    marginRight: 10,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.white,
+    gap: 10,
+    backgroundColor: '#E7F7F0',
   },
   shippingNoticeText: {
     flex: 1,
-    color: COLORS.tealDark,
+    color: '#101C2A',
     fontSize: 13,
     lineHeight: 19,
   },
   shippingNoticeStrong: { color: COLORS.teal, fontWeight: '900' },
-  cardHeading: {
-    color: COLORS.ink,
-    fontSize: 15,
-    fontWeight: '900',
-    marginTop: 9,
-    marginBottom: 10,
-  },
   couponRow: { height: 50, flexDirection: 'row' },
   couponInput: {
     flex: 1,

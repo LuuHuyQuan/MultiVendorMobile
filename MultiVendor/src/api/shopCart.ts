@@ -39,6 +39,26 @@ export interface ShopCheckoutRequest {
   district: string;
   province: string;
   customerNote?: string | null;
+  couponCode?: string | null;
+  paymentMethod?: 'COD' | 'WALLET';
+  shippingMethod?: 'standard' | 'express';
+  checkoutKey: string;
+  expectedGrandTotal?: number;
+}
+
+export interface ShopQuoteRequest {
+  couponCode?: string | null;
+  shippingMethod?: 'standard' | 'express';
+}
+
+export interface ShopQuote {
+  subtotal: number;
+  discountTotal: number;
+  shippingTotal: number;
+  taxTotal: number;
+  grandTotal: number;
+  shippingMethod: 'standard' | 'express';
+  couponCode: string | null;
 }
 
 export interface ShopCheckoutResult {
@@ -70,6 +90,9 @@ const requestData = async <T>(
 
 export const shopCartApi = {
   getCart: () => requestData<ShopCart>('/shop/cart'),
+
+  quote: (request: ShopQuoteRequest = {}) =>
+    requestData<ShopQuote>('/shop/cart/quote', 'POST', request),
 
   addItem: (variantId: number, quantity: number) =>
     requestData<ShopCartItem>('/shop/cart/items', 'POST', {

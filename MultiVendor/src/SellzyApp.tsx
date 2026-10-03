@@ -6,10 +6,12 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomNav } from './components/SellzyUI';
+import { QuickCartModal } from './components/QuickCartModal';
 import {
   clearSession,
   getSessionEmail,
@@ -17,11 +19,16 @@ import {
   login,
   register,
 } from './api/auth';
-import { shopCartApi, type ShopCart } from './api/shopCart';
+import { shopCartApi, type ShopCart, type ShopQuote } from './api/shopCart';
+import {
+  customerOrdersApi,
+  type CustomerOrderDetail,
+  type CustomerOrderSummary,
+  type CustomerReturnLineRequest,
+} from './api/customerOrders';
 import { ApiError } from './api/errors';
 import {
   changeQuantity,
-  createOrder,
   normalizeCoupon,
   reorderCart,
 } from './commerce';
@@ -49,6 +56,7 @@ import HomeScreen from './screens/HomeScreen';
 import AuthScreen from './screens/AuthScreen';
 import WalletScreen from './screens/WalletScreen';
 import SellerPortalScreen from './screens/SellerPortalScreen';
+import SellerOnboardingScreen from './screens/SellerOnboardingScreen';
 import { ProductDetailsScreen, ShopScreen } from './screens/ShopScreens';
 import { emptyStore, loadStore, saveStore, StoreData } from './storage';
 import { COLORS } from './theme';
@@ -70,6 +78,22 @@ const rootRoutes: RouteName[] = [
 ];
 
 const isRemoteCartId = (id: string) => /^\d+(?::\d+)?$/.test(id);
+const cartLineKey = (line: ShopCart['items'][number], catalog: LiveCatalog) => {
+  const base = catalog.products.find(product => product.id === String(line.productId));
+  return base
+    ? cartKeyForVariant(base, line.variantId)
+    : `${line.productId}:${line.variantId}`;
+};
+const createCheckoutKey = () =>
+  'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, character => {
+    const random = Math.floor(Math.random() * 16);
+    return (character === 'x' ? random : (random % 4) + 8).toString(16);
+  });
+const cartSignature = (cart: ShopCart, email: string) =>
+  `${email}:${cart.items
+    .map(item => `${item.variantId}:${item.quantity}`)
+    .sort()
+    .join('|')}`;
 const toCartFor = (cart: StoreData['cart'], catalog: Product[]) => {
   const ids = new Set(catalog.map(product => product.id));
   return Object.fromEntries(
@@ -90,18 +114,46 @@ const withActiveCart = (
 const fromServerCart = (server: ShopCart, catalog: LiveCatalog) => {
   const result: StoreData['cart'] = {};
   server.items.forEach(line => {
-    const base = catalog.products.find(product => product.id === String(line.productId));
-    if (!base) return;
-    const key = cartKeyForVariant(base, line.variantId);
-    if (catalog.cartProducts.some(product => product.id === key)) {
-      result[key] = line.quantity;
-    }
+    result[cartLineKey(line, catalog)] = line.quantity;
   });
   return result;
 };
 
+const serverOrderToOrder = (server: CustomerOrderSummary, saved?: Order): Order => {
+  const placed = new Date(server.placedAt);
+  const status = server.statusName.toLowerCase();
+  return {
+    id: server.orderNumber,
+    serverId: server.id,
+    date: Number.isNaN(placed.getTime())
+      ? server.placedAt
+      : placed.toLocaleDateString('vi-VN'),
+    total: server.grandTotal / 1000,
+    itemCount: server.itemCount,
+    status: status === 'delivered'
+      ? 'Delivered'
+      : status === 'shipped' || status === 'in_transit'
+      ? 'Shipped'
+      : 'Processing',
+    statusName: server.statusName,
+    paymentStatus: server.paymentStatus,
+    paymentMethod: server.paymentMethod,
+    productIds: saved?.productIds ?? [],
+    lines: saved?.lines,
+    simulated: false,
+  };
+};
+
+type RemoteOrdersState = {
+  email: string;
+  state: 'loading' | 'ready' | 'error';
+  items: Order[];
+  error?: string;
+};
+
 export default function SellzyApp() {
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
   const [routes, setRoutes] = useState<Route[]>([
     { name: 'home', key: 'home' },
   ]);
@@ -109,23 +161,81 @@ export default function SellzyApp() {
   const dataRef = useRef(data);
   const accountScope = useRef<string | undefined>(undefined);
   const [remoteCatalog, setRemoteCatalog] = useState<LiveCatalog | null>(null);
+  const [remoteOrdersState, setRemoteOrdersState] = useState<RemoteOrdersState | null>(null);
+  const [ordersRefresh, setOrdersRefresh] = useState(0);
   const [catalogError, setCatalogError] = useState(false);
   const [catalogAttempt, setCatalogAttempt] = useState(0);
-  const [serverSubtotal, setServerSubtotal] = useState<number | null>(null);
+  const [serverQuote, setServerQuote] = useState<ShopQuote | null>(null);
+  const [serverCart, setServerCart] = useState<{ email: string; cart: ShopCart } | null>(null);
   const hydratedAccount = useRef('');
+  const cartReadyAccount = useRef('');
+  const pendingGuestCart = useRef<StoreData['cart']>({});
+  const cartQueue = useRef<Promise<void>>(Promise.resolve());
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [toast, setToast] = useState('');
+  const [quickCartOpen, setQuickCartOpen] = useState(false);
   const placing = useRef(false);
+  const checkoutAttempt = useRef<{ signature: string; key: string } | null>(null);
   const sequence = useRef(0);
   const route = routes[routes.length - 1];
   const { auth, cart, coupon, wishlistIds, orders, profile } = data;
+  const currentRemoteOrders = auth.isLoggedIn && remoteOrdersState?.email === auth.email
+    ? remoteOrdersState
+    : null;
+  const displayedOrders = currentRemoteOrders?.state === 'ready'
+    ? [
+        ...currentRemoteOrders.items,
+        ...orders.filter(item => item.simulated !== false),
+      ]
+    : orders;
   const hasDemoCart = Object.keys(cart).some(id => !isRemoteCartId(id));
   const liveCatalog = remoteCatalog !== null && !hasDemoCart;
   const activeProducts = liveCatalog ? remoteCatalog.products : products;
-  const cartCatalog = liveCatalog ? remoteCatalog.cartProducts : products;
+  const remoteLines = serverCart?.email === auth.email && auth.isLoggedIn
+    ? serverCart.cart.items
+    : [];
+  const cartCatalog = liveCatalog
+    ? [
+        ...remoteCatalog.cartProducts.map(product => {
+          const line = remoteLines.find(item =>
+            cartLineKey(item, remoteCatalog) === product.id,
+          );
+          return line
+            ? {
+                ...product,
+                price: line.unitPrice / 1000,
+                priceTiers: undefined,
+                stock: line.availableQuantity,
+              }
+            : product;
+        }),
+        ...remoteLines.flatMap(line => {
+          const id = cartLineKey(line, remoteCatalog);
+          if (remoteCatalog.cartProducts.some(product => product.id === id)) return [];
+          return [{
+            id,
+            name: line.variantName && !/^(default|mặc định)$/i.test(line.variantName)
+              ? `${line.productName} · ${line.variantName}`
+              : line.productName,
+            store: 'Cửa hàng',
+            category: '',
+            image: require('./assets/logo.png'),
+            price: line.unitPrice / 1000,
+            oldPrice: line.unitPrice / 1000,
+            rating: 0,
+            reviews: 0,
+            discount: 0,
+            stock: line.availableQuantity,
+            description: '',
+            benefits: [],
+            variantId: line.variantId,
+          } satisfies Product];
+        }),
+      ]
+    : products;
   const activeCategories = liveCatalog ? remoteCatalog.categories : categories;
   const activeCart = toCartFor(cart, cartCatalog);
   const activeWishlistIds = wishlistIds.filter(id =>
@@ -135,6 +245,14 @@ export default function SellzyApp() {
     (sum, quantity) => sum + quantity,
     0,
   );
+  const cartBaseIds = new Set(Object.keys(activeCart).map(baseProductId));
+  const cartCategories = new Set(
+    cartCatalog.filter(product => activeCart[product.id]).map(product => product.category),
+  );
+  const recommendations = activeProducts
+    .filter(product => product.stock > 0 && !cartBaseIds.has(product.id))
+    .sort((a, b) => Number(cartCategories.has(b.category)) - Number(cartCategories.has(a.category)))
+    .slice(0, 12);
 
   useEffect(() => {
     let mounted = true;
@@ -226,6 +344,79 @@ export default function SellzyApp() {
       () => setSaveError(true),
     );
   };
+  const sameCartAccount = (email: string) =>
+    dataRef.current.auth.isLoggedIn && dataRef.current.auth.email === email;
+  const queueCartJob = (job: () => Promise<void>) => {
+    const result = cartQueue.current.then(job);
+    cartQueue.current = result.catch(() => undefined);
+    return result;
+  };
+  const applyServerCart = async (server: ShopCart, email: string, catalog: LiveCatalog) => {
+    if (!sameCartAccount(email)) return;
+    setServerCart({ email, cart: server });
+    const remoteItems = fromServerCart(server, catalog);
+    await commit(current => ({
+      ...current,
+      cart: {
+        ...Object.fromEntries(Object.entries(current.cart).filter(([id]) => !isRemoteCartId(id))),
+        ...remoteItems,
+      },
+    }));
+  };
+  const hydrateServerCart = (email: string, catalog: LiveCatalog): Promise<void> => {
+    if (hydratedAccount.current === email) return cartQueue.current;
+    hydratedAccount.current = email;
+    return queueCartJob(async () => {
+      if (!sameCartAccount(email)) return;
+      const guestItems = { ...pendingGuestCart.current };
+      let server = await shopCartApi.getCart();
+      for (const [id, quantity] of Object.entries(guestItems)) {
+        const product = catalog.cartProducts.find(item => item.id === id);
+        if (!product?.variantId || quantity < 1) continue;
+        const existing = server.items.find(item => item.variantId === product.variantId)?.quantity ?? 0;
+        const available = Math.max(0, product.stock - existing);
+        const toAdd = Math.min(quantity, available);
+        if (toAdd < 1) continue;
+        await shopCartApi.addItem(product.variantId, toAdd);
+        delete guestItems[id];
+        pendingGuestCart.current = guestItems;
+        server = await shopCartApi.getCart();
+      }
+      await applyServerCart(server, email, catalog);
+      if (sameCartAccount(email)) cartReadyAccount.current = email;
+      if (Object.keys(guestItems).length && sameCartAccount(email)) {
+        setToast('Một số sản phẩm trong giỏ khách đã hết hàng hoặc không còn bán.');
+      }
+    }).catch(error => {
+      if (sameCartAccount(email)) {
+        hydratedAccount.current = '';
+        cartReadyAccount.current = '';
+        setToast(error instanceof Error ? error.message : 'Không thể tải giỏ hàng.');
+      }
+      throw error;
+    });
+  };
+  const changeRemoteCart = (
+    variantId: number,
+    action: () => Promise<unknown>,
+  ) => {
+    const email = dataRef.current.auth.email;
+    const catalog = remoteCatalog;
+    if (!catalog || !sameCartAccount(email)) return;
+    queueCartJob(async () => {
+      if (!sameCartAccount(email)) return;
+      try {
+        await action();
+      } finally {
+        const server = await shopCartApi.getCart();
+        await applyServerCart(server, email, catalog);
+      }
+    }).catch(error => {
+      if (sameCartAccount(email)) {
+        setToast(error instanceof Error ? error.message : `Không thể cập nhật sản phẩm ${variantId}.`);
+      }
+    });
+  };
   const startFresh = async () => {
     const fresh = emptyStore();
     try {
@@ -274,6 +465,10 @@ export default function SellzyApp() {
   }, [route.name, routes.length, goBack]);
 
   const addToCart = (id: string, quantity = 1, variantId?: number) => {
+    if (liveCatalog && auth.isLoggedIn && cartReadyAccount.current !== auth.email) {
+      setToast('Đang đồng bộ giỏ hàng. Vui lòng thử lại.');
+      return false;
+    }
     const base = activeProducts.find(item => item.id === id);
     const key =
       liveCatalog && base && variantId
@@ -299,6 +494,11 @@ export default function SellzyApp() {
         cartCatalog,
       ),
     }));
+    if (liveCatalog && dataRef.current.auth.isLoggedIn && product.variantId) {
+      changeRemoteCart(product.variantId, () =>
+        shopCartApi.addItem(product.variantId!, quantity),
+      );
+    }
     setToast(
       `Đã thêm ${Math.min(
         quantity,
@@ -310,7 +510,109 @@ export default function SellzyApp() {
   const buyNow = (id: string, quantity = 1, variantId?: number) => {
     if (addToCart(id, quantity, variantId)) beginCheckout();
   };
-  const openCart = () => push({ name: 'cart' });
+  const removeCartItem = (id: string) => {
+    if (liveCatalog && auth.isLoggedIn && cartReadyAccount.current !== auth.email) {
+      setToast('Đang đồng bộ giỏ hàng. Vui lòng thử lại.');
+      return;
+    }
+    const variantId = cartCatalog.find(product => product.id === id)?.variantId;
+    commit(current => {
+      const next = { ...current.cart };
+      delete next[id];
+      return {
+        ...current,
+        cart: next,
+        coupon: Object.keys(next).length ? current.coupon : '',
+      };
+    });
+    if (liveCatalog && auth.isLoggedIn && variantId) {
+      changeRemoteCart(variantId, async () => {
+        try {
+          await shopCartApi.removeItem(variantId);
+        } catch (error) {
+          if (!(error instanceof ApiError && error.status === 404)) throw error;
+        }
+      });
+    }
+  };
+  const setCartQuantity = (id: string, quantity: number) => {
+    if (liveCatalog && auth.isLoggedIn && cartReadyAccount.current !== auth.email) {
+      setToast('Đang đồng bộ giỏ hàng. Vui lòng thử lại.');
+      return;
+    }
+    const variantId = cartCatalog.find(product => product.id === id)?.variantId;
+    commit(current => {
+      const next = withActiveCart(
+        current.cart,
+        changeQuantity(
+          toCartFor(current.cart, cartCatalog),
+          id,
+          quantity,
+          cartCatalog,
+        ),
+        cartCatalog,
+      );
+      return {
+        ...current,
+        cart: next,
+        coupon: Object.keys(next).length ? current.coupon : '',
+      };
+    });
+    if (liveCatalog && auth.isLoggedIn && variantId) {
+      changeRemoteCart(variantId, async () => {
+        if (quantity < 1) {
+          try {
+            await shopCartApi.removeItem(variantId);
+          } catch (error) {
+            if (!(error instanceof ApiError && error.status === 404)) throw error;
+          }
+          return;
+        }
+        try {
+          await shopCartApi.updateItem(variantId, quantity);
+        } catch (error) {
+          if (!(error instanceof ApiError && error.status === 404)) throw error;
+          await shopCartApi.addItem(variantId, quantity);
+        }
+      });
+    }
+  };
+  const clearCart = () => {
+    if (liveCatalog && auth.isLoggedIn && cartReadyAccount.current !== auth.email) {
+      setToast('Đang đồng bộ giỏ hàng. Vui lòng thử lại.');
+      return;
+    }
+    commit(current => ({
+      ...current,
+      cart: withActiveCart(current.cart, {}, cartCatalog),
+      coupon: '',
+    }));
+    if (liveCatalog && auth.isLoggedIn) {
+      changeRemoteCart(0, async () => {
+        const server = await shopCartApi.getCart();
+        for (const item of server.items) {
+          await shopCartApi.removeItem(item.variantId);
+        }
+      });
+    }
+  };
+  const openCart = () => {
+    if (remoteCatalog && dataRef.current.auth.isLoggedIn) {
+      const email = dataRef.current.auth.email;
+      const catalog = remoteCatalog;
+      queueCartJob(async () => {
+        if (!sameCartAccount(email)) return;
+        const server = await shopCartApi.getCart();
+        await applyServerCart(server, email, catalog);
+      }).catch(error => {
+        if (sameCartAccount(email)) {
+          setToast(error instanceof Error ? error.message : 'Không thể tải giỏ hàng.');
+        }
+      });
+    }
+    if (windowWidth >= 800) setQuickCartOpen(true);
+    else push({ name: 'cart' });
+  };
   const openShop = (category?: string, query?: string, sort?: SortMode) =>
     push({ name: 'shop', category, query, sort });
   const openProduct = (id: string) =>
@@ -336,47 +638,33 @@ export default function SellzyApp() {
     commit(current => ({ ...current, coupon: normalized }));
     return true;
   };
-  const syncServerCart = async (localCart: StoreData['cart']) => {
-    if (!remoteCatalog) throw new Error('Chưa tải được danh mục sản phẩm.');
-    const desired = new Map<number, number>();
-    Object.entries(localCart).forEach(([id, quantity]) => {
-      const product = remoteCatalog.cartProducts.find(item => item.id === id);
-      if (!product?.variantId) {
-        throw new Error('Có sản phẩm không còn bán trong giỏ hàng.');
-      }
-      desired.set(product.variantId, quantity);
-    });
-    if (!desired.size) throw new Error('Giỏ hàng đang trống.');
-    const existing = await shopCartApi.getCart();
-    for (const item of existing.items) {
-      const quantity = desired.get(item.variantId);
-      if (quantity === undefined) {
-        await shopCartApi.removeItem(item.variantId);
-      } else if (quantity !== item.quantity) {
-        await shopCartApi.updateItem(item.variantId, quantity);
-      }
+  const verifyServerCart = async (catalog: LiveCatalog) => {
+    const email = dataRef.current.auth.email;
+    await hydrateServerCart(email, catalog);
+    await cartQueue.current;
+    const server = await shopCartApi.getCart();
+    const serverItems = fromServerCart(server, catalog);
+    const localItems = Object.fromEntries(
+      Object.entries(dataRef.current.cart).filter(([id]) => isRemoteCartId(id)),
+    );
+    const changed =
+      Object.keys(localItems).length !== Object.keys(serverItems).length ||
+      Object.entries(serverItems).some(([id, quantity]) => localItems[id] !== quantity);
+    await applyServerCart(server, email, catalog);
+    if (changed) {
+      throw new Error('Giỏ hàng đã thay đổi trên thiết bị khác. Vui lòng xem lại trước khi đặt hàng.');
     }
-    const existingIds = new Set(existing.items.map(item => item.variantId));
-    for (const [variantId, quantity] of desired) {
-      if (!existingIds.has(variantId)) {
-        await shopCartApi.addItem(variantId, quantity);
-      }
-    }
-    const verified = await shopCartApi.getCart();
-    if (
-      verified.items.length !== desired.size ||
-      verified.items.some(item => desired.get(item.variantId) !== item.quantity)
-    ) {
-      throw new Error('Giỏ hàng đã thay đổi. Vui lòng thử lại.');
-    }
-    return verified;
+    if (!server.items.length) throw new Error('Giỏ hàng đang trống.');
+    return server;
   };
   const beginCheckout = async () => {
     const current = dataRef.current;
     const useLive = remoteCatalog !== null &&
       !Object.keys(current.cart).some(id => !isRemoteCartId(id));
     if (!useLive) {
-      push({ name: 'checkout' });
+      setToast(remoteCatalog
+        ? 'Vui lòng xóa sản phẩm mẫu trong giỏ trước khi đặt hàng trực tuyến.'
+        : 'Chưa kết nối được cửa hàng. Vui lòng thử lại khi có mạng.');
       return;
     }
     if (!current.auth.isLoggedIn) {
@@ -384,9 +672,16 @@ export default function SellzyApp() {
       return;
     }
     try {
-      const currentCart = toCartFor(current.cart, remoteCatalog.cartProducts);
-      const verified = await syncServerCart(currentCart);
-      setServerSubtotal(verified.subtotal / 1000);
+      const verified = await verifyServerCart(remoteCatalog);
+      const quote = await shopCartApi.quote({ shippingMethod: 'standard' });
+      if (Math.abs(verified.subtotal - quote.subtotal) > 0.005) {
+        throw new Error('Giá giỏ hàng đã thay đổi. Vui lòng thử lại.');
+      }
+      const signature = cartSignature(verified, current.auth.email);
+      if (checkoutAttempt.current?.signature !== signature) {
+        checkoutAttempt.current = { signature, key: createCheckoutKey() };
+      }
+      setServerQuote(quote);
       push({ name: 'checkout' });
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
@@ -411,14 +706,20 @@ export default function SellzyApp() {
         if (details.payment !== 'cash' || !details.district?.trim()) {
           throw new Error('Đơn hàng chỉ hỗ trợ COD và cần địa chỉ đầy đủ.');
         }
-        const localCart = toCartFor(current.cart, cartCatalog);
-        const verified = await syncServerCart(localCart);
+        if (!remoteCatalog) throw new Error('Chưa tải được danh mục sản phẩm.');
+        const verified = await verifyServerCart(remoteCatalog);
+        const quote = await shopCartApi.quote({ shippingMethod: 'standard' });
         if (
-          serverSubtotal !== null &&
-          Math.round(verified.subtotal) !== Math.round(serverSubtotal * 1000)
+          !serverQuote ||
+          Math.abs(verified.subtotal - quote.subtotal) > 0.005 ||
+          Math.abs(quote.grandTotal - serverQuote.grandTotal) > 0.005
         ) {
-          setServerSubtotal(verified.subtotal / 1000);
-          throw new Error('Giá đơn hàng đã thay đổi. Vui lòng xem lại tổng tiền.');
+          setServerQuote(quote);
+          throw new Error('Tổng tiền đã thay đổi. Vui lòng xem lại trước khi đặt hàng.');
+        }
+        const signature = cartSignature(verified, current.auth.email);
+        if (checkoutAttempt.current?.signature !== signature) {
+          checkoutAttempt.current = { signature, key: createCheckoutKey() };
         }
         const placed = await shopCartApi.checkout({
           recipientName: details.fullName.trim(),
@@ -426,6 +727,11 @@ export default function SellzyApp() {
           addressLine: details.address.trim(),
           district: details.district.trim(),
           province: details.city.trim(),
+          paymentMethod: 'COD',
+          shippingMethod: quote.shippingMethod,
+          couponCode: quote.couponCode,
+          checkoutKey: checkoutAttempt.current.key,
+          expectedGrandTotal: quote.grandTotal,
         });
         const lines = verified.items.map(item => {
           const base = remoteCatalog?.products.find(
@@ -445,6 +751,10 @@ export default function SellzyApp() {
         });
         order = {
           id: placed.orderNumber,
+          serverId: placed.orderId,
+          statusName: 'pending',
+          paymentStatus: 'pending',
+          paymentMethod: 'COD',
           date: new Date().toLocaleDateString('vi-VN'),
           total: placed.grandTotal / 1000,
           itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
@@ -452,24 +762,19 @@ export default function SellzyApp() {
           productIds: lines.map(line => line.productId),
           lines,
           delivery: { ...details, payment: 'cash' },
-          subtotal: verified.subtotal / 1000,
-          discount: 0,
-          shipping: (placed.grandTotal - verified.subtotal) / 1000,
+          subtotal: quote.subtotal / 1000,
+          discount: quote.discountTotal / 1000,
+          shipping: quote.shippingTotal / 1000,
+          tax: quote.taxTotal / 1000,
           simulated: false,
         };
+        setServerCart({
+          email: current.auth.email,
+          cart: { cartId: verified.cartId, items: [], subtotal: 0 },
+        });
+        checkoutAttempt.current = null;
       } else {
-        const created = createOrder(
-          toCartFor(current.cart, cartCatalog),
-          current.coupon,
-          details,
-          `SZ-${Date.now().toString(36).toUpperCase()}-${++sequence.current}`,
-          new Date(),
-          cartCatalog,
-        );
-        if (!created) {
-          throw new Error('Vui lòng kiểm tra thông tin giao hàng và giỏ hàng.');
-        }
-        order = created;
+        throw new Error('Chưa kết nối được cửa hàng. Vui lòng thử lại khi có mạng.');
       }
       await commit(previous => ({
         ...previous,
@@ -477,6 +782,8 @@ export default function SellzyApp() {
         cart: withActiveCart(previous.cart, {}, cartCatalog),
         coupon: '',
       }));
+      setServerQuote(null);
+      if (liveCatalog) setOrdersRefresh(value => value + 1);
       setRoutes([
         { name: 'home', key: 'home' },
         { name: 'success', key: order.id, orderId: order.id },
@@ -503,6 +810,9 @@ export default function SellzyApp() {
   const finishAuthentication = async (email: string, fullName?: string) => {
     const normalizedEmail = email.trim().toLowerCase();
     const guest = dataRef.current;
+    pendingGuestCart.current = guest.auth.isLoggedIn
+      ? {}
+      : Object.fromEntries(Object.entries(guest.cart).filter(([id]) => isRemoteCartId(id)));
     const account = await loadStore(
       [...products, ...(remoteCatalog?.cartProducts ?? [])],
       normalizedEmail,
@@ -537,7 +847,11 @@ export default function SellzyApp() {
       const base =
         activeRoute?.name === 'auth' ? current.slice(0, -1) : current;
       if (returnTo === 'checkout') return base;
-      const destination = returnTo === 'wallet' ? 'wallet' : 'account';
+      const destination = returnTo === 'wallet'
+        ? 'wallet'
+        : returnTo === 'sellerOnboarding'
+        ? 'sellerOnboarding'
+        : 'account';
       if (base[base.length - 1]?.name === destination) return base;
       return [
         ...base,
@@ -548,6 +862,9 @@ export default function SellzyApp() {
       ];
     });
     setToast('Đăng nhập thành công.');
+    if (remoteCatalog) {
+      await hydrateServerCart(normalizedEmail, remoteCatalog).catch(() => undefined);
+    }
     if (returnTo === 'checkout') await beginCheckout();
   };
   const signIn = async (email: string, password: string) => {
@@ -577,7 +894,13 @@ export default function SellzyApp() {
       return;
     }
     accountScope.current = undefined;
+    setRemoteOrdersState(null);
+    setServerQuote(null);
+    setServerCart(null);
+    checkoutAttempt.current = null;
     hydratedAccount.current = '';
+    cartReadyAccount.current = '';
+    pendingGuestCart.current = {};
     const guest = await loadStore().catch(() => emptyStore());
     const next = { ...guest, auth: { ...defaultAuthSession } };
     dataRef.current = next;
@@ -588,7 +911,13 @@ export default function SellzyApp() {
   const requireLogin = async (returnTo: 'wallet' | 'checkout') => {
     await clearSession().catch(() => undefined);
     accountScope.current = undefined;
+    setRemoteOrdersState(null);
+    setServerQuote(null);
+    setServerCart(null);
+    checkoutAttempt.current = null;
     hydratedAccount.current = '';
+    cartReadyAccount.current = '';
+    pendingGuestCart.current = {};
     const guest = await loadStore().catch(() => emptyStore());
     const next = { ...guest, auth: { ...defaultAuthSession } };
     dataRef.current = next;
@@ -601,24 +930,86 @@ export default function SellzyApp() {
   };
 
   useEffect(() => {
-    if (!ready || !liveCatalog || !remoteCatalog || !auth.isLoggedIn) return;
-    if (hydratedAccount.current === auth.email) return;
-    hydratedAccount.current = auth.email;
-    if (Object.keys(toCartFor(dataRef.current.cart, remoteCatalog.cartProducts)).length) {
+    if (!ready || !auth.isLoggedIn) {
+      setRemoteOrdersState(null);
       return;
     }
     let cancelled = false;
-    shopCartApi.getCart().then(server => {
-      if (cancelled || !server.items.length) return;
-      const restored = fromServerCart(server, remoteCatalog);
-      if (!Object.keys(restored).length) return;
-      commit(current => ({
-        ...current,
-        cart: { ...current.cart, ...restored },
-      }));
-    }).catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [ready, liveCatalog, remoteCatalog, auth.isLoggedIn, auth.email]);
+    const controller = new AbortController();
+    const email = auth.email;
+    setRemoteOrdersState({ email, state: 'loading', items: [] });
+    customerOrdersApi.listAll(controller.signal).then(items => {
+      if (cancelled) return;
+      const saved = new Map(
+        dataRef.current.orders
+          .filter(item => item.simulated === false)
+          .map(item => [item.id, item]),
+      );
+      setRemoteOrdersState({
+        email,
+        state: 'ready',
+        items: items.map(item => serverOrderToOrder(item, saved.get(item.orderNumber))),
+      });
+    }).catch(error => {
+      if (cancelled) return;
+      setRemoteOrdersState({
+        email,
+        state: 'error',
+        items: [],
+        error: error instanceof Error
+          ? error.message
+          : 'Không thể tải lịch sử đơn hàng.',
+      });
+    });
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [ready, auth.isLoggedIn, auth.email, ordersRefresh]);
+
+  const loadOrderDetail = useCallback(
+    (id: number): Promise<CustomerOrderDetail> => customerOrdersApi.detail(id),
+    [],
+  );
+  const cancelOrder = async (id: number, reason: string) => {
+    await customerOrdersApi.cancel(id, reason);
+    setOrdersRefresh(value => value + 1);
+  };
+  const requestOrderReturn = async (
+    id: number,
+    reason: string,
+    lines: CustomerReturnLineRequest[],
+  ) => {
+    await customerOrdersApi.requestReturn(id, reason, lines);
+    setOrdersRefresh(value => value + 1);
+  };
+  const reorderServerOrder = (order: Order, detail: CustomerOrderDetail) => {
+    const available = remoteCatalog?.cartProducts ?? [];
+    const lines = detail.items.flatMap(item => {
+      const product = available.find(candidate =>
+        candidate.variantId === item.variantId &&
+        baseProductId(candidate.id) === String(item.productId),
+      );
+      return product ? [{
+        productId: product.id,
+        name: item.productName,
+        price: item.unitPrice / 1000,
+        quantity: item.quantity,
+      }] : [];
+    });
+    if (!lines.length) {
+      setToast('Sản phẩm trong đơn không còn bán.');
+      return;
+    }
+    reorder({ ...order, lines, productIds: lines.map(item => item.productId) });
+  };
+
+  useEffect(() => {
+    if (!ready || !remoteCatalog || !auth.isLoggedIn) return;
+    hydrateServerCart(auth.email, remoteCatalog).catch(() => undefined);
+    // The account marker prevents duplicate hydration while UI state changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, remoteCatalog, auth.isLoggedIn, auth.email]);
 
   if (!ready) {
     return (
@@ -714,6 +1105,7 @@ export default function SellzyApp() {
           <ProductDetailsScreen
             {...shared}
             product={product}
+            isLoggedIn={auth.isLoggedIn}
             onBuyNow={buyNow}
           />
         );
@@ -729,33 +1121,16 @@ export default function SellzyApp() {
             onBack={goBack}
             onCheckout={beginCheckout}
             onOpenProduct={openProduct}
-            onRemove={id => {
-              commit(current => {
-                const next = { ...current.cart };
-                delete next[id];
-                return {
-                  ...current,
-                cart: next,
-                  coupon: Object.keys(next).length ? current.coupon : '',
-                };
-              });
-            }}
-            onSetQuantity={(id, quantity) => {
-              commit(current => ({
-                ...current,
-                cart: withActiveCart(
-                  current.cart,
-                  changeQuantity(
-                    toCartFor(current.cart, cartCatalog),
-                    id,
-                    quantity,
-                    cartCatalog,
-                  ),
-                  cartCatalog,
-                ),
-              }));
-            }}
+            onRemove={removeCartItem}
+            onSetQuantity={setCartQuantity}
+            onClear={clearCart}
+            wishlistIds={activeWishlistIds}
+            onToggleWishlist={toggleWishlist}
+            onAddProduct={id => { addToCart(id); }}
             onShop={() => goRoot('shop')}
+            onHome={() => goRoot('home')}
+            onSellers={() => push({ name: 'sellers' })}
+            onHelp={() => push({ name: 'help' })}
             topInset={insets.top}
           />
         );
@@ -766,12 +1141,13 @@ export default function SellzyApp() {
             catalogProducts={cartCatalog}
             liveCatalog={liveCatalog}
             totalsOverride={
-              liveCatalog && serverSubtotal !== null
+              liveCatalog && serverQuote !== null
                 ? {
-                    subtotal: serverSubtotal,
-                    discount: 0,
-                    shipping: 0,
-                    total: serverSubtotal,
+                    subtotal: serverQuote.subtotal / 1000,
+                    discount: serverQuote.discountTotal / 1000,
+                    shipping: serverQuote.shippingTotal / 1000,
+                    tax: serverQuote.taxTotal / 1000,
+                    total: serverQuote.grandTotal / 1000,
                   }
                 : undefined
             }
@@ -804,9 +1180,17 @@ export default function SellzyApp() {
           <OrdersScreen
             {...shared}
             catalogProducts={[...products, ...(remoteCatalog?.cartProducts ?? [])]}
+            loading={currentRemoteOrders?.state === 'loading'}
+            loadError={currentRemoteOrders?.state === 'error' ? currentRemoteOrders.error : undefined}
+            onRefresh={() => setOrdersRefresh(value => value + 1)}
+            onLoadDetail={loadOrderDetail}
+            onCancelOrder={cancelOrder}
+            onRequestReturn={requestOrderReturn}
+            onReorderServer={reorderServerOrder}
             onReorder={reorder}
             onShop={() => goRoot('shop')}
-            orders={orders}
+            orders={displayedOrders}
+            synced={currentRemoteOrders?.state === 'ready'}
           />
         );
       case 'wishlist':
@@ -840,7 +1224,7 @@ export default function SellzyApp() {
                 ? push({ name: 'wallet' })
                 : push({ name: 'auth', returnTo: 'wallet' })
             }
-            orderCount={orders.length}
+            orderCount={displayedOrders.length}
             wishlistCount={activeWishlistIds.length}
           />
         );
@@ -861,17 +1245,24 @@ export default function SellzyApp() {
         );
       case 'sellerPortal':
         return <SellerPortalScreen onBack={goBack} topInset={insets.top} />;
+      case 'sellerOnboarding':
+        return (
+          <SellerOnboardingScreen
+            topInset={insets.top}
+            isLoggedIn={auth.isLoggedIn}
+            initialBusinessName={data.vendorDraft.storeName}
+            onBack={goBack}
+            onLogin={() => push({ name: 'auth', returnTo: 'sellerOnboarding' })}
+            onSellerPortal={() => push({ name: 'sellerPortal' })}
+          />
+        );
       case 'sellers':
         return (
           <SellersScreen
             {...shared}
             catalogVendors={liveCatalog ? remoteCatalog.vendors : undefined}
             onShop={store => push({ name: 'shop', store })}
-            vendorDraft={data.vendorDraft}
-            onSaveVendorDraft={next => {
-              commit(current => ({ ...current, vendorDraft: next }));
-              setToast('Đã lưu bản nháp cửa hàng trên thiết bị.');
-            }}
+            onSellerOnboarding={() => push({ name: 'sellerOnboarding' })}
           />
         );
       case 'help':
@@ -936,6 +1327,28 @@ export default function SellzyApp() {
           wishlistCount={activeWishlistIds.length}
         />
       ) : null}
+      <QuickCartModal
+        visible={quickCartOpen}
+        cart={activeCart}
+        catalogProducts={cartCatalog}
+        recommendations={recommendations}
+        onClose={() => setQuickCartOpen(false)}
+        onViewCart={() => {
+          setQuickCartOpen(false);
+          push({ name: 'cart' });
+        }}
+        onCheckout={() => {
+          setQuickCartOpen(false);
+          beginCheckout();
+        }}
+        onOpenProduct={id => {
+          setQuickCartOpen(false);
+          openProduct(id);
+        }}
+        onAdd={id => { addToCart(id); }}
+        onSetQuantity={setCartQuantity}
+        onRemove={removeCartItem}
+      />
       {toast ? (
         <View
           accessibilityLiveRegion="polite"

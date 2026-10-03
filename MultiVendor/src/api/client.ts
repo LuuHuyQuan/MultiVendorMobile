@@ -16,7 +16,7 @@ declare const process: {
 };
 
 const platformBaseUrl = Platform.select({
-  web: 'https://localhost:7226/api',
+  web: 'http://localhost:5027/api',
   android: 'http://10.0.2.2:5027/api',
   default: 'http://localhost:5027/api',
 });

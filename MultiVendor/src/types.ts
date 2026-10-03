@@ -32,6 +32,11 @@ export type OrderStatus = 'Processing' | 'Shipped' | 'Delivered';
 
 export type Order = {
   id: string;
+  /** Backend order id; absent for offline/demo orders and old local snapshots. */
+  serverId?: number;
+  statusName?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
   date: string;
   total: number;
   itemCount: number;
@@ -42,6 +47,7 @@ export type Order = {
   subtotal?: number;
   discount?: number;
   shipping?: number;
+  tax?: number;
   coupon?: string;
   simulated?: boolean;
 };
@@ -84,6 +90,7 @@ export type RouteName =
   | 'auth'
   | 'wallet'
   | 'sellerPortal'
+  | 'sellerOnboarding'
   | 'sellers'
   | 'help';
 
@@ -96,5 +103,5 @@ export type Route = {
   sort?: SortMode;
   key?: string;
   orderId?: string;
-  returnTo?: 'account' | 'wallet' | 'checkout';
+  returnTo?: 'account' | 'wallet' | 'checkout' | 'sellerOnboarding';
 };
