@@ -1,6 +1,7 @@
 import { apiRequest } from './api/client';
 import type {
   ApiResult,
+  WalletActivity,
   LinkedBankAccount,
   LinkBankRequest,
   MoneyRequest,
@@ -44,6 +45,11 @@ export const walletApi = {
     requestData<WalletTransaction[]>(
       '/wallet/transactions?page=1&pageSize=50',
     ),
+
+  getActivity: () =>
+    requestData<{ items: WalletActivity[] }>(
+      '/wallet/activity?page=1&pageSize=50',
+    ).then(page => page.items),
 
   requestTopUp: (request: MoneyRequest) =>
     requestData<WalletTransaction>('/wallet/top-ups', {

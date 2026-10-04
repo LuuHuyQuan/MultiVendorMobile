@@ -28,8 +28,7 @@ import type {
   LinkedBankAccount,
   LinkBankRequest,
   WalletStatus,
-  WalletTransaction,
-  WalletTransactionStatus,
+  WalletActivity,
   WalletTransactionType,
 } from '../walletTypes';
 import type { WalletSummary } from '../walletTypes';
@@ -64,10 +63,13 @@ const walletStatusLabels: Record<WalletStatus, string> = {
   closed: 'Đã đóng',
 };
 
-const transactionStatusLabels: Record<WalletTransactionStatus, string> = {
+const transactionStatusLabels: Record<WalletActivity['statusName'], string> = {
   pending: 'Đang chờ',
   completed: 'Thành công',
   failed: 'Không thành công',
+  paid: 'Đã thanh toán',
+  refunded: 'Đã hoàn tiền',
+  partially_refunded: 'Hoàn tiền một phần',
 };
 
 function formatMoney(value: number, currency = 'VND') {
@@ -253,7 +255,7 @@ export default function WalletScreen({
   const [banks, setBanks] = useState<LinkedBankAccount[]>([]);
   const [banksLoaded, setBanksLoaded] = useState(false);
   const [banksError, setBanksError] = useState('');
-  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
+  const [transactions, setTransactions] = useState<WalletActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -307,7 +309,7 @@ export default function WalletScreen({
         await Promise.allSettled([
           walletApi.getWallet(),
           walletApi.getBanks(),
-          walletApi.getTransactions(),
+          walletApi.getActivity(),
         ]);
 
       if (mountedRef.current && sequence === loadSequenceRef.current) {
@@ -607,7 +609,7 @@ export default function WalletScreen({
     setHistoryLoading(true);
     setHistoryError('');
     try {
-      const result = await walletApi.getTransactions();
+      const result = await walletApi.getActivity();
       if (mountedRef.current) setTransactions(result);
     } catch (error: unknown) {
       if (mountedRef.current) {
@@ -923,16 +925,23 @@ export default function WalletScreen({
           </View>
           <Text style={styles.inlineStateTitle}>Chưa có giao dịch</Text>
           <Text style={styles.inlineStateText}>
-            Các yêu cầu nạp và rút tiền sẽ xuất hiện tại đây.
+            Giao dịch nạp, rút, mua hàng và hoàn tiền sẽ xuất hiện tại đây.
           </Text>
         </View>
       ) : (
         <View style={styles.transactionList}>
           {transactions.map((transaction, index) => {
-            const isTopUp = transaction.transactionType === 'top_up';
+            const isCredit = transaction.direction === 'credit';
+            const title = transaction.transactionType === 'top_up'
+              ? 'Nạp tiền'
+              : transaction.transactionType === 'withdrawal'
+                ? 'Rút tiền'
+                : transaction.transactionType === 'refund'
+                  ? 'Hoàn tiền đơn hàng'
+                  : 'Thanh toán đơn hàng';
             return (
               <View
-                key={transaction.id}
+                key={transaction.key}
                 style={[
                   styles.transactionRow,
                   index < transactions.length - 1 && styles.transactionDivider,
@@ -941,43 +950,38 @@ export default function WalletScreen({
                 <View
                   style={[
                     styles.transactionIcon,
-                    !isTopUp && styles.transactionIconWithdrawal,
+                    !isCredit && styles.transactionIconWithdrawal,
                   ]}
                 >
                   <Icon
-                    name={isTopUp ? 'plus' : 'arrow-up-right'}
-                    color={isTopUp ? COLORS.success : '#A36500'}
+                    name={isCredit ? 'plus' : 'arrow-up-right'}
+                    color={isCredit ? COLORS.success : '#A36500'}
                     size={19}
                   />
                 </View>
                 <View style={styles.transactionCopy}>
                   <Text style={styles.transactionTitle}>
-                    {isTopUp ? 'Nạp tiền' : 'Rút tiền'}
+                    {title}
                   </Text>
                   <Text style={styles.transactionMeta}>
-                    {formatDateTime(transaction.createdAt)} · #{transaction.id}
+                    {formatDateTime(transaction.occurredAt)}{transaction.orderNumber ? ` · ${transaction.orderNumber}` : ''}
                   </Text>
-                  {transaction.description ? (
-                    <Text numberOfLines={2} style={styles.transactionDescription}>
-                      {transaction.description}
-                    </Text>
-                  ) : null}
                 </View>
                 <View style={styles.transactionAmountBlock}>
                   <Text
                     numberOfLines={1}
                     style={[
                       styles.transactionAmount,
-                      isTopUp && styles.transactionAmountPositive,
+                      isCredit && styles.transactionAmountPositive,
                     ]}
                   >
-                    {isTopUp ? '+' : '−'}
-                    {formatMoney(transaction.amount, wallet?.currency)}
+                    {isCredit ? '+' : '−'}
+                    {formatMoney(transaction.amount, transaction.currency)}
                   </Text>
                   <View
                     style={[
                       styles.transactionStatus,
-                      transaction.statusName === 'completed' &&
+                      (transaction.statusName === 'completed' || transaction.statusName === 'paid') &&
                         styles.transactionStatusComplete,
                       transaction.statusName === 'failed' &&
                         styles.transactionStatusFailed,
@@ -986,7 +990,7 @@ export default function WalletScreen({
                     <Text
                       style={[
                         styles.transactionStatusText,
-                        transaction.statusName === 'completed' &&
+                        (transaction.statusName === 'completed' || transaction.statusName === 'paid') &&
                           styles.transactionStatusCompleteText,
                         transaction.statusName === 'failed' &&
                           styles.transactionStatusFailedText,

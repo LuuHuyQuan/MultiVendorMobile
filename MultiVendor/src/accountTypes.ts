@@ -2,10 +2,12 @@ export type AccountProfile = {
   name: string;
   email: string;
   phone: string;
+  recipientName: string;
+  recipientPhone: string;
   address: string;
   district?: string;
   city: string;
-  payment: 'cash' | 'card';
+  payment: 'cash' | 'card' | 'wallet';
   notifications: boolean;
 };
 
@@ -13,6 +15,8 @@ export const defaultAccountProfile: AccountProfile = {
   name: '',
   email: '',
   phone: '',
+  recipientName: '',
+  recipientPhone: '',
   address: '',
   district: '',
   city: '',

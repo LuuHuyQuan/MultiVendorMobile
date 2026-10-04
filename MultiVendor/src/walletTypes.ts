@@ -42,6 +42,18 @@ export interface WalletTransaction {
   processedAt: string | null;
 }
 
+export interface WalletActivity {
+  key: string;
+  transactionType: WalletTransactionType | 'purchase' | 'refund';
+  direction: 'credit' | 'debit';
+  statusName: WalletTransactionStatus | 'paid' | 'refunded' | 'partially_refunded';
+  amount: number;
+  currency: string;
+  occurredAt: string;
+  orderId: number | null;
+  orderNumber: string | null;
+}
+
 export interface LinkBankRequest {
   bankCode: string;
   bankName: string;

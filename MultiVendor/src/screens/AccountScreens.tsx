@@ -799,7 +799,7 @@ type AccountProps = {
   liveCatalog?: boolean;
   onAuth: () => void;
   onLogout: () => void;
-  onSaveProfile: (profile: AccountProfile) => void;
+  onSaveProfile: (profile: AccountProfile, mode: ProfileEditor) => Promise<void>;
   onCart: () => void;
   onOrders: () => void;
   onWishlist: () => void;
@@ -846,7 +846,7 @@ export function AccountScreen({
       <ScreenHeader
         cartCount={cartCount}
         onCart={onCart}
-        subtitle="Thông tin mua sắm trên thiết bị này"
+        subtitle="Thông tin mua sắm của bạn"
         title="Tài khoản của tôi"
       />
       <ScrollView
@@ -927,9 +927,11 @@ export function AccountScreen({
           label="Phương thức thanh toán"
           onPress={() => setEditor('payment')}
           subtitle={
-            liveCatalog || profile.payment === 'cash'
-              ? 'Ưu tiên thanh toán khi nhận hàng'
-              : 'Ưu tiên thanh toán thẻ mẫu'
+            profile.payment === 'wallet' && liveCatalog
+              ? 'Ưu tiên thanh toán bằng ví'
+              : !liveCatalog && profile.payment === 'card'
+                ? 'Ưu tiên thanh toán thẻ mẫu'
+                : 'Ưu tiên thanh toán khi nhận hàng'
           }
         />
         <MenuItem
@@ -1003,10 +1005,7 @@ export function AccountScreen({
           mode={editor}
           liveCatalog={liveCatalog}
           onClose={() => setEditor(null)}
-          onSave={nextProfile => {
-            onSaveProfile(nextProfile);
-            setEditor(null);
-          }}
+          onSave={nextProfile => onSaveProfile(nextProfile, editor)}
           profile={profile}
         />
       ) : null}
@@ -1037,7 +1036,7 @@ export function AccountScreen({
   );
 }
 
-type ProfileEditor = 'profile' | 'address' | 'payment' | 'preferences';
+export type ProfileEditor = 'profile' | 'address' | 'payment' | 'preferences';
 
 const editorTitles: Record<ProfileEditor, string> = {
   profile: 'Chỉnh sửa hồ sơ',
@@ -1056,13 +1055,17 @@ function ProfileForm({
   mode: ProfileEditor;
   profile: AccountProfile;
   liveCatalog: boolean;
-  onSave: (profile: AccountProfile) => void;
+  onSave: (profile: AccountProfile) => Promise<void>;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState<AccountProfile>(() => ({
     ...profile,
-    payment: liveCatalog ? 'cash' : profile.payment,
+    recipientName: profile.recipientName || profile.name,
+    recipientPhone: profile.recipientPhone || profile.phone,
+    payment: liveCatalog && profile.payment === 'card' ? 'cash' : profile.payment,
   }));
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [errors, setErrors] = useState<
     Partial<Record<keyof AccountProfile, string>>
   >({});
@@ -1073,12 +1076,15 @@ function ProfileForm({
     setDraft(current => ({ ...current, [key]: value }));
     setErrors(current => ({ ...current, [key]: undefined }));
   };
-  const save = () => {
+  const save = async () => {
+    if (saving) return;
     const cleaned = {
       ...draft,
       name: draft.name.trim(),
       email: draft.email.trim(),
       phone: draft.phone.trim(),
+      recipientName: draft.recipientName.trim(),
+      recipientPhone: draft.recipientPhone.trim(),
       address: draft.address.trim(),
       district: draft.district?.trim() ?? '',
       city: draft.city.trim(),
@@ -1108,10 +1114,25 @@ function ProfileForm({
       if (hasAddress && cleaned.city.length < 2) {
         nextErrors.city = 'Vui lòng nhập tỉnh/thành phố.';
       }
+      if (hasAddress && cleaned.recipientName.length < 2) {
+        nextErrors.recipientName = 'Vui lòng nhập tên người nhận.';
+      }
+      if (hasAddress && !/^\+?[\d\s().-]{7,20}$/.test(cleaned.recipientPhone)) {
+        nextErrors.recipientPhone = 'Vui lòng nhập số điện thoại người nhận.';
+      }
     }
     setErrors(nextErrors);
     if (!Object.keys(nextErrors).length) {
-      onSave(cleaned);
+      setSaving(true);
+      setSaveError('');
+      try {
+        await onSave(cleaned);
+        onClose();
+      } catch (error) {
+        setSaveError(error instanceof Error ? error.message : 'Không thể lưu thay đổi.');
+      } finally {
+        setSaving(false);
+      }
     }
   };
   return (
@@ -1119,8 +1140,9 @@ function ProfileForm({
       {mode === 'profile' ? (
         <>
           <AccountNotice>
-            Lưu thông tin trên thiết bị để thanh toán nhanh hơn trong những lần
-            sau. Email liên hệ ở đây không thay đổi email dùng để đăng nhập.
+            {liveCatalog
+              ? 'Họ tên và số điện thoại được đồng bộ với tài khoản của bạn. Email đăng nhập không thể đổi tại đây.'
+              : 'Thông tin được lưu trên thiết bị để thanh toán nhanh hơn.'}
           </AccountNotice>
           <AccountField
             autoCapitalize="words"
@@ -1132,7 +1154,7 @@ function ProfileForm({
             placeholder="Nhập họ và tên"
             value={draft.name}
           />
-          <AccountField
+          {!liveCatalog ? <AccountField
             autoCapitalize="none"
             autoComplete="email"
             error={errors.email}
@@ -1142,7 +1164,7 @@ function ProfileForm({
             onChangeText={value => update('email', value)}
             placeholder="you@example.com"
             value={draft.email}
-          />
+          /> : null}
           <AccountField
             autoComplete="tel"
             error={errors.phone}
@@ -1162,6 +1184,24 @@ function ProfileForm({
             hoặc thay đổi trước khi lưu đơn hàng. Để trống cả hai trường để xóa
             địa chỉ đã lưu.
           </AccountNotice>
+          <AccountField
+            autoCapitalize="words"
+            error={errors.recipientName}
+            label="Tên người nhận"
+            maxLength={150}
+            onChangeText={value => update('recipientName', value)}
+            placeholder="Họ tên người nhận"
+            value={draft.recipientName}
+          />
+          <AccountField
+            error={errors.recipientPhone}
+            keyboardType="phone-pad"
+            label="Số điện thoại người nhận"
+            maxLength={30}
+            onChangeText={value => update('recipientPhone', value)}
+            placeholder="Số điện thoại liên hệ"
+            value={draft.recipientPhone}
+          />
           <AccountField
             autoComplete="street-address"
             error={errors.address}
@@ -1196,7 +1236,7 @@ function ProfileForm({
         <>
           <AccountNotice>
             {liveCatalog
-              ? 'Đơn hàng gửi đến cửa hàng hiện hỗ trợ thanh toán khi nhận hàng.'
+              ? 'Chọn thanh toán khi nhận hàng hoặc dùng số dư ví Sellzy.'
               : 'Chọn phương thức mặc định cho đơn hàng mẫu. Ứng dụng không thu thập thông tin thẻ và không thực hiện giao dịch thật.'}
           </AccountNotice>
           <PaymentOption
@@ -1205,6 +1245,14 @@ function ProfileForm({
             onPress={() => update('payment', 'cash')}
             selected={draft.payment === 'cash'}
           />
+          {liveCatalog ? (
+            <PaymentOption
+              description="Thanh toán bằng số dư ví Sellzy khi đặt hàng."
+              label="Ví Sellzy"
+              onPress={() => update('payment', 'wallet')}
+              selected={draft.payment === 'wallet'}
+            />
+          ) : null}
           {!liveCatalog ? (
             <PaymentOption
               description="Thanh toán thẻ mô phỏng, không phát sinh giao dịch."
@@ -1240,7 +1288,8 @@ function ProfileForm({
           </Text>
         </>
       ) : null}
-      <AccountAction label="Lưu thay đổi" onPress={save} />
+      {saveError ? <Text style={styles.formHelp}>{saveError}</Text> : null}
+      <AccountAction label={saving ? 'Đang lưu...' : 'Lưu thay đổi'} onPress={() => void save()} />
     </AccountDialog>
   );
 }

@@ -65,7 +65,7 @@ export interface ShopCheckoutResult {
   orderId: number;
   orderNumber: string;
   grandTotal: number;
-  paymentMethod: 'COD';
+  paymentMethod: 'COD' | 'WALLET';
 }
 
 const requestData = async <T>(

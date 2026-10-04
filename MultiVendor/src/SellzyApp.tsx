@@ -20,6 +20,8 @@ import {
   register,
 } from './api/auth';
 import { shopCartApi, type ShopCart, type ShopQuote } from './api/shopCart';
+import { customerShoppingApi } from './api/customerShopping';
+import { accountApi, type CustomerAddress } from './api/account';
 import {
   customerOrdersApi,
   type CustomerOrderDetail,
@@ -46,6 +48,7 @@ import {
   OrdersScreen,
   SellersScreen,
   WishlistScreen,
+  type ProfileEditor,
 } from './screens/AccountScreens';
 import {
   CartScreen,
@@ -171,6 +174,11 @@ export default function SellzyApp() {
   const cartReadyAccount = useRef('');
   const pendingGuestCart = useRef<StoreData['cart']>({});
   const cartQueue = useRef<Promise<void>>(Promise.resolve());
+  const pendingGuestWishlist = useRef<string[]>([]);
+  const wishlistReadyAccount = useRef('');
+  const wishlistQueue = useRef<Promise<void>>(Promise.resolve());
+  const defaultAddressId = useRef<number | null>(null);
+  const profileAvatarUrl = useRef<string | null>(null);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -346,6 +354,143 @@ export default function SellzyApp() {
   };
   const sameCartAccount = (email: string) =>
     dataRef.current.auth.isLoggedIn && dataRef.current.auth.email === email;
+
+  const saveAccountProfile = async (next: StoreData['profile'], mode: ProfileEditor) => {
+    const current = dataRef.current;
+    if (!current.auth.isLoggedIn) {
+      await commit(previous => ({ ...previous, profile: next }));
+      setToast('Đã lưu thông tin trên thiết bị.');
+      return;
+    }
+    const email = current.auth.email;
+    if (mode === 'profile') {
+      const server = await accountApi.updateProfile({
+        fullName: next.name,
+        phone: next.phone || null,
+        avatarUrl: profileAvatarUrl.current,
+      });
+      if (!sameCartAccount(email)) return;
+      await commit(previous => ({
+        ...previous,
+        profile: {
+          ...previous.profile,
+          name: server.fullName,
+          phone: server.phone ?? '',
+          email: server.email,
+        },
+      }));
+    } else if (mode === 'address') {
+      if (!next.address) {
+        if (defaultAddressId.current !== null) {
+          await accountApi.deleteAddress(defaultAddressId.current);
+        }
+      } else {
+        const request = {
+          label: 'Nhà',
+          recipientName: next.recipientName,
+          phone: next.recipientPhone,
+          addressLine1: next.address,
+          district: next.district || null,
+          city: next.city,
+          countryCode: 'VN',
+          isDefault: true,
+        };
+        if (defaultAddressId.current !== null) {
+          await accountApi.updateAddress(defaultAddressId.current, request);
+        } else {
+          await accountApi.addAddress(request);
+        }
+      }
+      const addresses = await accountApi.getAddresses();
+      if (!sameCartAccount(email)) return;
+      const selected = addresses.find(address => address.isDefault) ?? addresses[0];
+      defaultAddressId.current = selected?.id ?? null;
+      await commit(previous => ({
+        ...previous,
+        profile: {
+          ...previous.profile,
+          recipientName: selected?.recipientName ?? '',
+          recipientPhone: selected?.phone ?? '',
+          address: selected?.addressLine1 ?? '',
+          district: selected?.district ?? '',
+          city: selected?.city ?? '',
+        },
+      }));
+    } else {
+      await commit(previous => ({ ...previous, profile: next }));
+    }
+    setToast(mode === 'payment' || mode === 'preferences'
+      ? 'Đã lưu tùy chọn trên thiết bị.'
+      : 'Đã đồng bộ thông tin tài khoản.');
+  };
+
+  useEffect(() => {
+    if (!ready || !auth.isLoggedIn) return;
+    let active = true;
+    const email = auth.email;
+    Promise.all([accountApi.getProfile(), accountApi.getAddresses()]).then(
+      async ([server, addresses]) => {
+        if (!active || !sameCartAccount(email)) return;
+        const selected: CustomerAddress | undefined =
+          addresses.find(address => address.isDefault) ?? addresses[0];
+        defaultAddressId.current = selected?.id ?? null;
+        profileAvatarUrl.current = server.avatarUrl;
+        await commit(previous => ({
+          ...previous,
+          profile: {
+            ...previous.profile,
+            name: server.fullName,
+            email: server.email,
+            phone: server.phone ?? '',
+            recipientName: selected?.recipientName ?? '',
+            recipientPhone: selected?.phone ?? '',
+            address: selected?.addressLine1 ?? '',
+            district: selected?.district ?? '',
+            city: selected?.city ?? '',
+          },
+        }));
+      },
+      error => {
+        if (active && sameCartAccount(email)) {
+          setToast(error instanceof Error ? error.message : 'Không thể tải thông tin tài khoản.');
+        }
+      },
+    );
+    return () => { active = false; };
+  }, [ready, auth.isLoggedIn, auth.email]);
+
+  useEffect(() => {
+    if (!ready || !auth.isLoggedIn || !remoteCatalog || wishlistReadyAccount.current === auth.email) return;
+    const email = auth.email;
+    const validIds = new Set(remoteCatalog.products.map(product => Number(product.id)));
+    const hydrate = async () => {
+      const serverIds = new Set(await customerShoppingApi.getWishlistIds());
+      const legacyIds = dataRef.current.wishlistMigrated ? [] : dataRef.current.wishlistIds;
+      const pendingIds = [...legacyIds, ...pendingGuestWishlist.current]
+        .map(id => Number(baseProductId(id)))
+        .filter(id => Number.isSafeInteger(id) && validIds.has(id));
+      for (const id of new Set(pendingIds)) {
+        if (!sameCartAccount(email)) return;
+        if (!serverIds.has(id)) {
+          await customerShoppingApi.addWishlist(id);
+          serverIds.add(id);
+        }
+      }
+      if (!sameCartAccount(email)) return;
+      await commit(current => ({
+        ...current,
+        wishlistIds: [...serverIds].map(String),
+        wishlistMigrated: true,
+      }));
+      pendingGuestWishlist.current = [];
+      wishlistReadyAccount.current = email;
+    };
+    void hydrate().catch(error => {
+      if (sameCartAccount(email)) {
+        setToast(error instanceof Error ? error.message : 'Không thể đồng bộ sản phẩm yêu thích.');
+      }
+    });
+  }, [ready, auth.isLoggedIn, auth.email, remoteCatalog]);
   const queueCartJob = (job: () => Promise<void>) => {
     const result = cartQueue.current.then(job);
     cartQueue.current = result.catch(() => undefined);
@@ -403,6 +548,8 @@ export default function SellzyApp() {
     const email = dataRef.current.auth.email;
     const catalog = remoteCatalog;
     if (!catalog || !sameCartAccount(email)) return;
+    setServerQuote(null);
+    checkoutAttempt.current = null;
     queueCartJob(async () => {
       if (!sameCartAccount(email)) return;
       try {
@@ -618,6 +765,10 @@ export default function SellzyApp() {
   const openProduct = (id: string) =>
     push({ name: 'product', productId: baseProductId(id) });
   const toggleWishlist = (id: string) => {
+    if (liveCatalog && auth.isLoggedIn && wishlistReadyAccount.current !== auth.email) {
+      setToast('Đang đồng bộ sản phẩm yêu thích. Vui lòng thử lại.');
+      return;
+    }
     const liked = dataRef.current.wishlistIds.includes(id);
     commit(current => ({
       ...current,
@@ -630,9 +781,47 @@ export default function SellzyApp() {
         ? 'Đã bỏ khỏi danh sách yêu thích.'
         : 'Đã thêm vào danh sách yêu thích.',
     );
+    if (liveCatalog && auth.isLoggedIn) {
+      const email = auth.email;
+      const productId = Number(baseProductId(id));
+      if (!Number.isSafeInteger(productId) || productId < 1) return;
+      const job = wishlistQueue.current.then(async () => {
+        if (!sameCartAccount(email)) return;
+        if (liked) await customerShoppingApi.removeWishlist(productId);
+        else await customerShoppingApi.addWishlist(productId);
+        if (!sameCartAccount(email)) return;
+        const ids = await customerShoppingApi.getWishlistIds();
+        if (sameCartAccount(email)) {
+          await commit(current => ({ ...current, wishlistIds: ids.map(String) }));
+        }
+      });
+      wishlistQueue.current = job.catch(() => undefined);
+      void job.catch(async error => {
+        if (!sameCartAccount(email)) return;
+        try {
+          const ids = await customerShoppingApi.getWishlistIds();
+          await commit(current => ({ ...current, wishlistIds: ids.map(String) }));
+        } catch {
+          // Keep the local selection visible until the API is reachable again.
+        }
+        setToast(error instanceof Error ? error.message : 'Không thể cập nhật sản phẩm yêu thích.');
+      });
+    }
   };
-  const applyCoupon = (code: string) => {
-    if (liveCatalog) return false;
+  const applyCoupon = async (code: string): Promise<boolean> => {
+    if (liveCatalog) {
+      if (!auth.isLoggedIn || !remoteCatalog) {
+        throw new Error('Vui lòng đăng nhập để dùng mã giảm giá.');
+      }
+      await verifyServerCart(remoteCatalog);
+      const quote = await shopCartApi.quote({
+        couponCode: code.trim().toUpperCase() || null,
+        shippingMethod: 'standard',
+      });
+      await commit(current => ({ ...current, coupon: quote.couponCode ?? '' }));
+      setServerQuote(quote);
+      return true;
+    }
     const normalized = normalizeCoupon(code);
     if (!normalized && code.trim()) return false;
     commit(current => ({ ...current, coupon: normalized }));
@@ -673,7 +862,10 @@ export default function SellzyApp() {
     }
     try {
       const verified = await verifyServerCart(remoteCatalog);
-      const quote = await shopCartApi.quote({ shippingMethod: 'standard' });
+      const quote = await shopCartApi.quote({
+        couponCode: dataRef.current.coupon || null,
+        shippingMethod: 'standard',
+      });
       if (Math.abs(verified.subtotal - quote.subtotal) > 0.005) {
         throw new Error('Giá giỏ hàng đã thay đổi. Vui lòng thử lại.');
       }
@@ -703,12 +895,15 @@ export default function SellzyApp() {
         if (!current.auth.isLoggedIn) {
           throw new Error('Vui lòng đăng nhập để đặt hàng.');
         }
-        if (details.payment !== 'cash' || !details.district?.trim()) {
-          throw new Error('Đơn hàng chỉ hỗ trợ COD và cần địa chỉ đầy đủ.');
+        if (!['cash', 'wallet'].includes(details.payment) || !details.district?.trim()) {
+          throw new Error('Vui lòng chọn thanh toán khi nhận hàng hoặc ví, và nhập địa chỉ đầy đủ.');
         }
         if (!remoteCatalog) throw new Error('Chưa tải được danh mục sản phẩm.');
         const verified = await verifyServerCart(remoteCatalog);
-        const quote = await shopCartApi.quote({ shippingMethod: 'standard' });
+        const quote = await shopCartApi.quote({
+          couponCode: current.coupon || null,
+          shippingMethod: 'standard',
+        });
         if (
           !serverQuote ||
           Math.abs(verified.subtotal - quote.subtotal) > 0.005 ||
@@ -727,7 +922,7 @@ export default function SellzyApp() {
           addressLine: details.address.trim(),
           district: details.district.trim(),
           province: details.city.trim(),
-          paymentMethod: 'COD',
+          paymentMethod: details.payment === 'wallet' ? 'WALLET' : 'COD',
           shippingMethod: quote.shippingMethod,
           couponCode: quote.couponCode,
           checkoutKey: checkoutAttempt.current.key,
@@ -753,15 +948,15 @@ export default function SellzyApp() {
           id: placed.orderNumber,
           serverId: placed.orderId,
           statusName: 'pending',
-          paymentStatus: 'pending',
-          paymentMethod: 'COD',
+          paymentStatus: details.payment === 'wallet' ? 'paid' : 'pending',
+          paymentMethod: placed.paymentMethod,
           date: new Date().toLocaleDateString('vi-VN'),
           total: placed.grandTotal / 1000,
           itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
           status: 'Processing',
           productIds: lines.map(line => line.productId),
           lines,
-          delivery: { ...details, payment: 'cash' },
+          delivery: details,
           subtotal: quote.subtotal / 1000,
           discount: quote.discountTotal / 1000,
           shipping: quote.shippingTotal / 1000,
@@ -813,6 +1008,8 @@ export default function SellzyApp() {
     pendingGuestCart.current = guest.auth.isLoggedIn
       ? {}
       : Object.fromEntries(Object.entries(guest.cart).filter(([id]) => isRemoteCartId(id)));
+    pendingGuestWishlist.current = guest.auth.isLoggedIn ? [] : guest.wishlistIds;
+    wishlistReadyAccount.current = '';
     const account = await loadStore(
       [...products, ...(remoteCatalog?.cartProducts ?? [])],
       normalizedEmail,
@@ -821,6 +1018,7 @@ export default function SellzyApp() {
       ...account,
       cart: { ...account.cart, ...guest.cart },
       wishlistIds: [...new Set([...account.wishlistIds, ...guest.wishlistIds])],
+      wishlistMigrated: account.wishlistMigrated,
       auth: { isLoggedIn: true, email: normalizedEmail },
       profile: {
         ...account.profile,
@@ -901,6 +1099,10 @@ export default function SellzyApp() {
     hydratedAccount.current = '';
     cartReadyAccount.current = '';
     pendingGuestCart.current = {};
+    pendingGuestWishlist.current = [];
+    wishlistReadyAccount.current = '';
+    defaultAddressId.current = null;
+    profileAvatarUrl.current = null;
     const guest = await loadStore().catch(() => emptyStore());
     const next = { ...guest, auth: { ...defaultAuthSession } };
     dataRef.current = next;
@@ -918,6 +1120,10 @@ export default function SellzyApp() {
     hydratedAccount.current = '';
     cartReadyAccount.current = '';
     pendingGuestCart.current = {};
+    pendingGuestWishlist.current = [];
+    wishlistReadyAccount.current = '';
+    defaultAddressId.current = null;
+    profileAvatarUrl.current = null;
     const guest = await loadStore().catch(() => emptyStore());
     const next = { ...guest, auth: { ...defaultAuthSession } };
     dataRef.current = next;
@@ -1116,6 +1322,17 @@ export default function SellzyApp() {
             cart={activeCart}
             catalogProducts={cartCatalog}
             liveCatalog={liveCatalog}
+            totalsOverride={
+              liveCatalog && serverQuote !== null
+                ? {
+                    subtotal: serverQuote.subtotal / 1000,
+                    discount: serverQuote.discountTotal / 1000,
+                    shipping: serverQuote.shippingTotal / 1000,
+                    tax: serverQuote.taxTotal / 1000,
+                    total: serverQuote.grandTotal / 1000,
+                  }
+                : undefined
+            }
             couponCode={coupon}
             onApplyCoupon={applyCoupon}
             onBack={goBack}
@@ -1155,12 +1372,12 @@ export default function SellzyApp() {
             onBack={goBack}
             onPlaceOrder={placeOrder}
             initialDetails={{
-              fullName: profile.name,
-              phone: profile.phone,
+              fullName: profile.recipientName || profile.name,
+              phone: profile.recipientPhone || profile.phone,
               address: profile.address,
               district: profile.district,
               city: profile.city,
-              payment: liveCatalog ? 'cash' : profile.payment,
+              payment: liveCatalog && profile.payment === 'card' ? 'cash' : profile.payment,
             }}
             topInset={insets.top}
           />
@@ -1210,10 +1427,7 @@ export default function SellzyApp() {
             onAuth={() => push({ name: 'auth', returnTo: 'account' })}
             onLogout={signOut}
             profile={profile}
-            onSaveProfile={next => {
-              commit(current => ({ ...current, profile: next }));
-              setToast('Đã lưu hồ sơ trên thiết bị.');
-            }}
+            onSaveProfile={saveAccountProfile}
             onHelp={() => push({ name: 'help' })}
             onOrders={() => goRoot('orders')}
             onSellers={() => push({ name: 'sellers' })}

@@ -25,6 +25,7 @@ import {
 } from '../commerce';
 import { Icon, IconName } from '../components/Icon';
 import { COLORS, money } from '../theme';
+import { walletApi } from '../walletApi';
 import {
   CartQuantities,
   CustomerDetails,
@@ -44,7 +45,7 @@ type CartProps = {
   catalogProducts?: Product[];
   liveCatalog?: boolean;
   totalsOverride?: DisplayTotals;
-  onApplyCoupon: (code: string) => boolean;
+  onApplyCoupon: (code: string) => Promise<boolean>;
   onBack: () => void;
   onHome: () => void;
   onShop: () => void;
@@ -110,7 +111,7 @@ export function CartScreen({
   const { width } = useWindowDimensions();
   const wide = width >= 1200;
   const [coupon, setCoupon] = useState(couponCode);
-  const [couponError, setCouponError] = useState(false);
+  const [couponError, setCouponError] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const couponApplied = !!couponCode;
   const lines = cartProducts(cart, catalogProducts);
@@ -258,7 +259,6 @@ export function CartScreen({
                 <Text style={[styles.summaryTitle, styles.cartSummaryTitle]}>
                   {wide ? 'Order Summary' : 'Tóm tắt đơn hàng'}
                 </Text>
-                {!liveCatalog ? (
                   <>
                     <View style={styles.couponRow}>
                       <TextInput
@@ -266,9 +266,9 @@ export function CartScreen({
                         autoCapitalize="characters"
                         onChangeText={value => {
                           setCoupon(value);
-                          setCouponError(false);
+                          setCouponError('');
                         }}
-                        placeholder={wide ? 'Coupon Code' : 'Nhập SELLZY10'}
+                        placeholder={wide ? 'Coupon Code' : liveCatalog ? 'Nhập mã giảm giá' : 'Nhập SELLZY10'}
                         placeholderTextColor="#98A1A6"
                         style={styles.couponInput}
                         value={coupon}
@@ -276,7 +276,12 @@ export function CartScreen({
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="Áp dụng mã ưu đãi"
-                        onPress={() => setCouponError(!onApplyCoupon(coupon))}
+                        onPress={() => {
+                          void onApplyCoupon(coupon).then(
+                            valid => setCouponError(valid ? '' : 'Mã ưu đãi không hợp lệ.'),
+                            error => setCouponError(error instanceof Error ? error.message : 'Không thể áp dụng mã ưu đãi.'),
+                          );
+                        }}
                         style={styles.couponButton}
                       >
                         <Text style={styles.couponButtonText}>{wide ? 'Apply' : 'Áp dụng'}</Text>
@@ -284,7 +289,7 @@ export function CartScreen({
                     </View>
                     {couponError ? (
                       <Text style={[styles.couponMessage, styles.couponError]}>
-                        Mã ưu đãi không hợp lệ. Hãy thử SELLZY10.
+                        {couponError}
                       </Text>
                     ) : null}
                     {couponApplied ? (
@@ -296,9 +301,9 @@ export function CartScreen({
                           accessibilityRole="button"
                           accessibilityLabel="Xóa mã ưu đãi"
                           onPress={() => {
-                            onApplyCoupon('');
+                            void onApplyCoupon('');
                             setCoupon('');
-                            setCouponError(false);
+                            setCouponError('');
                           }}
                         >
                           <Text style={styles.removeCoupon}>Xóa</Text>
@@ -306,7 +311,6 @@ export function CartScreen({
                       </View>
                     ) : null}
                   </>
-                ) : null}
                 <SummaryRow label={wide ? 'Sub-Total' : 'Tạm tính'} value={money(subtotal)} />
                 {discount > 0 ? (
                   <SummaryRow label={wide ? 'Discount' : 'Giảm giá'} positive value={'−' + money(discount)} />
@@ -590,6 +594,8 @@ export function CheckoutScreen({
   const [paymentAttempted, setPaymentAttempted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [walletError, setWalletError] = useState('');
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const lines = cartProducts(cart, catalogProducts);
   const { subtotal, discount, shipping, tax = 0, total } = screenTotals(
@@ -609,7 +615,21 @@ export function CheckoutScreen({
     !districtError && Object.keys(deliveryErrors).length === 0;
   const paymentValid =
     details.payment === 'cash' ||
+    (liveCatalog && details.payment === 'wallet' && walletBalance !== null && walletBalance >= Math.round(total * 1000)) ||
     (!liveCatalog && Object.keys(cardErrors).length === 0);
+
+  useEffect(() => {
+    if (!liveCatalog) return;
+    let active = true;
+    walletApi.getWallet().then(wallet => {
+      if (!active) return;
+      if (wallet.statusName === 'active') setWalletBalance(wallet.availableBalance);
+      else setWalletError('Ví chưa hoạt động. Vui lòng chọn thanh toán khi nhận hàng.');
+    }).catch(error => {
+      if (active) setWalletError(error instanceof Error ? error.message : 'Không thể tải số dư ví.');
+    });
+    return () => { active = false; };
+  }, [liveCatalog]);
 
   const update = (key: keyof CustomerDetails, value: string) =>
     setDetails(current => ({ ...current, [key]: value }));
@@ -754,7 +774,7 @@ export function CheckoutScreen({
               </View>
               <CheckoutSummary
                 cart={cart}
-                couponCode={liveCatalog ? '' : couponCode}
+                couponCode={couponCode}
                 discount={discount}
                 tax={tax}
                 lines={lines}
@@ -797,6 +817,17 @@ export function CheckoutScreen({
                       : 'Đơn được lưu ngay, thanh toán khi nhận hàng'
                   }
                 />
+                {liveCatalog ? (
+                  <PaymentOption
+                    active={details.payment === 'wallet'}
+                    icon="wallet"
+                    label="Thanh toán bằng ví Sellzy"
+                    onPress={() => update('payment', 'wallet')}
+                    subtitle={walletBalance !== null
+                      ? `Số dư: ${money(walletBalance / 1000)}`
+                      : walletError || 'Đang kiểm tra số dư ví'}
+                  />
+                ) : null}
                 {!liveCatalog ? (
                   <PaymentOption
                     active={details.payment === 'card'}
@@ -901,7 +932,9 @@ export function CheckoutScreen({
                 ) : null}
                 {paymentAttempted && !paymentValid ? (
                   <Text style={styles.formError}>
-                    Vui lòng kiểm tra các trường thẻ mẫu đang được đánh dấu.
+                    {details.payment === 'wallet'
+                      ? walletError || 'Số dư ví không đủ để thanh toán đơn hàng.'
+                      : 'Vui lòng kiểm tra các trường thẻ mẫu đang được đánh dấu.'}
                   </Text>
                 ) : null}
               </View>
@@ -978,6 +1011,8 @@ export function CheckoutScreen({
                 <Text style={styles.reviewStrong}>
                   {details.payment === 'cash'
                     ? 'Thanh toán khi nhận hàng'
+                    : details.payment === 'wallet'
+                    ? 'Thanh toán bằng ví Sellzy'
                     : `Thẻ mẫu kết thúc bằng ${card.number
                         .replace(/\D/g, '')
                         .slice(-4)}`}
@@ -991,7 +1026,7 @@ export function CheckoutScreen({
               </View>
               <CheckoutSummary
                 cart={cart}
-                couponCode={liveCatalog ? '' : couponCode}
+                couponCode={couponCode}
                 discount={discount}
                 tax={tax}
                 lines={lines}

@@ -30,6 +30,7 @@ export type StoreData = {
   version: 1;
   cart: CartQuantities;
   wishlistIds: string[];
+  wishlistMigrated: boolean;
   coupon: string;
   orders: Order[];
   profile: AccountProfile;
@@ -42,6 +43,7 @@ export function emptyStore(): StoreData {
     version: 1,
     cart: {},
     wishlistIds: [],
+    wishlistMigrated: false,
     coupon: '',
     orders: [],
     profile: { ...defaultAccountProfile },
@@ -75,6 +77,7 @@ export function restoreStore(
       ),
     ];
   }
+  result.wishlistMigrated = parsed.wishlistMigrated === true;
   if (Array.isArray(parsed.orders)) {
     result.orders = parsed.orders.filter(
       (order): order is Order =>
@@ -112,7 +115,8 @@ export function restoreStore(
                 'string',
             ) &&
             (order.delivery.payment === 'cash' ||
-              order.delivery.payment === 'card'))),
+              order.delivery.payment === 'card' ||
+              order.delivery.payment === 'wallet'))),
     );
   }
   if (isRecord(parsed.profile)) {
@@ -120,6 +124,8 @@ export function restoreStore(
       'name',
       'email',
       'phone',
+      'recipientName',
+      'recipientPhone',
       'address',
       'district',
       'city',
@@ -128,7 +134,9 @@ export function restoreStore(
         result.profile[key] = parsed.profile[key].slice(0, 500);
     }
     result.profile.payment =
-      parsed.profile.payment === 'card' ? 'card' : 'cash';
+      parsed.profile.payment === 'card' || parsed.profile.payment === 'wallet'
+        ? parsed.profile.payment
+        : 'cash';
     result.profile.notifications = parsed.profile.notifications === true;
   }
   if (isRecord(parsed.auth)) {

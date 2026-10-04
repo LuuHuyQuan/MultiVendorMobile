@@ -67,7 +67,7 @@ export type CustomerDetails = {
   address: string;
   city: string;
   district?: string;
-  payment: 'cash' | 'card';
+  payment: 'cash' | 'card' | 'wallet';
 };
 
 export type DemoCardDetails = {
