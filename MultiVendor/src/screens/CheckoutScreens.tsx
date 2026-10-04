@@ -181,6 +181,12 @@ export function CartScreen({
             <Text style={styles.cartBreadcrumbCurrent}>Cart</Text>
           </View>
         ) : null}
+        {!liveCatalog ? (
+          <View style={styles.demoNotice}>
+            <Icon name="info" color="#77601A" size={18} />
+            <Text style={styles.demoNoticeText}>Đang hiển thị sản phẩm mẫu. Cần kết nối cửa hàng để đặt hàng trực tuyến.</Text>
+          </View>
+        ) : null}
         {wide || lines.length ? (
           <View style={[styles.cartHeadingRow, !wide && styles.cartHeadingRowMobile]}>
             {wide ? (
@@ -277,7 +283,7 @@ export function CartScreen({
                         accessibilityRole="button"
                         accessibilityLabel="Áp dụng mã ưu đãi"
                         onPress={() => {
-                          void onApplyCoupon(coupon).then(
+                          onApplyCoupon(coupon).then(
                             valid => setCouponError(valid ? '' : 'Mã ưu đãi không hợp lệ.'),
                             error => setCouponError(error instanceof Error ? error.message : 'Không thể áp dụng mã ưu đãi.'),
                           );
@@ -301,9 +307,12 @@ export function CartScreen({
                           accessibilityRole="button"
                           accessibilityLabel="Xóa mã ưu đãi"
                           onPress={() => {
-                            void onApplyCoupon('');
-                            setCoupon('');
-                            setCouponError('');
+                            onApplyCoupon('').then(() => {
+                              setCoupon('');
+                              setCouponError('');
+                            }).catch(error => {
+                              setCouponError(error instanceof Error ? error.message : 'Không thể xóa mã ưu đãi.');
+                            });
                           }}
                         >
                           <Text style={styles.removeCoupon}>Xóa</Text>
@@ -358,7 +367,7 @@ export function CartScreen({
                   onPress={onCheckout}
                   style={[styles.cartAsideCheckout, !confirmed && styles.cartAsideCheckoutDisabled]}
                 >
-                  <Text style={styles.cartAsideCheckoutText}>Proceed to checkout</Text>
+                  <Text style={styles.cartAsideCheckoutText}>{liveCatalog ? 'Proceed to checkout' : 'Connect to checkout'}</Text>
                 </Pressable>
               ) : null}
               <Pressable accessibilityRole="button" onPress={onShop} style={styles.cartContinueButton}>
@@ -388,7 +397,7 @@ export function CartScreen({
             <Text style={styles.footerTotal}>{money(total)}</Text>
           </View>
           <Pressable accessibilityRole="button" onPress={onCheckout} style={styles.checkoutButton}>
-            <Text style={styles.checkoutButtonText}>Thanh toán →</Text>
+            <Text style={styles.checkoutButtonText}>{liveCatalog ? 'Thanh toán →' : 'Kết nối để đặt hàng'}</Text>
           </Pressable>
         </View>
       ) : null}

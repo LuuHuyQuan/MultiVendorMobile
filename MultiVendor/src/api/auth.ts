@@ -41,6 +41,20 @@ export const register = (request: RegisterRequest): Promise<RegisterResponse> =>
     retryOnUnauthorized: false,
   });
 
+export const forgotPassword = async (email: string): Promise<string> => {
+  const response = await apiRequest<{ success: boolean; message: string }>(
+    '/auth/forgot-password',
+    {
+      method: 'POST',
+      body: { email },
+      auth: false,
+      retryOnUnauthorized: false,
+    },
+  );
+  if (!response?.success) throw new ApiError(502, 'Không thể gửi yêu cầu khôi phục mật khẩu.', response);
+  return response.message;
+};
+
 export const refresh = (): Promise<AuthTokenResponse> => refreshSession();
 
 export const getCurrentUser = async (): Promise<CurrentUser> => {
@@ -66,6 +80,7 @@ export const getSessionEmail = (): Promise<string | null> =>
 export const authApi = {
   login,
   register,
+  forgotPassword,
   refresh,
   getCurrentUser,
   clearSession,

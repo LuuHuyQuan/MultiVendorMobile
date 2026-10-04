@@ -89,6 +89,7 @@ export type RouteName =
   | 'account'
   | 'auth'
   | 'wallet'
+  | 'notifications'
   | 'sellerPortal'
   | 'sellerOnboarding'
   | 'sellers'

@@ -15,6 +15,8 @@ import type {
   CustomerOrderDetail,
   CustomerReturnLineRequest,
 } from '../api/customerOrders';
+import { customerSupportApi, type Faq, type SupportTicket, type SupportTicketDetail } from '../api/customerSupport';
+import { accountApi } from '../api/account';
 
 import {
   AccountProfile,
@@ -796,7 +798,6 @@ type AccountProps = {
   orderCount: number;
   auth: AuthSession;
   profile: AccountProfile;
-  liveCatalog?: boolean;
   onAuth: () => void;
   onLogout: () => void;
   onSaveProfile: (profile: AccountProfile, mode: ProfileEditor) => Promise<void>;
@@ -807,6 +808,7 @@ type AccountProps = {
   onSellerPortal: () => void;
   onHelp: () => void;
   onWallet: () => void;
+  onNotifications: () => void;
 };
 
 export function AccountScreen({
@@ -816,7 +818,6 @@ export function AccountScreen({
   orderCount,
   auth,
   profile,
-  liveCatalog = false,
   onAuth,
   onLogout,
   onSaveProfile,
@@ -827,9 +828,35 @@ export function AccountScreen({
   onSellerPortal,
   onHelp,
   onWallet,
+  onNotifications,
 }: AccountProps) {
   const [editor, setEditor] = useState<ProfileEditor | null>(null);
   const [showLogout, setShowLogout] = useState(false);
+  const [passwordEditor, setPasswordEditor] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSaved, setPasswordSaved] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const savePassword = async () => {
+    if (passwordSaving) return;
+    if (newPassword.length < 8) {
+      setPasswordError('Mật khẩu mới cần có ít nhất 8 ký tự.');
+      return;
+    }
+    setPasswordSaving(true);
+    setPasswordError('');
+    try {
+      await accountApi.changePassword(currentPassword, newPassword);
+      setCurrentPassword('');
+      setNewPassword('');
+      setPasswordSaved(true);
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : 'Không thể đổi mật khẩu.');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
   const initials = auth.isLoggedIn && profile.name.trim()
     ? profile.name
         .trim()
@@ -866,7 +893,7 @@ export function AccountScreen({
             <Text style={styles.profileEmail}>
               {auth.isLoggedIn
                 ? auth.email
-                : 'Mua sắm tự do — không cần tài khoản'}
+                : 'Xem sản phẩm tự do — đăng nhập để đặt hàng'}
             </Text>
             <View style={styles.memberBadge}>
               <Text style={styles.memberText}>
@@ -927,9 +954,9 @@ export function AccountScreen({
           label="Phương thức thanh toán"
           onPress={() => setEditor('payment')}
           subtitle={
-            profile.payment === 'wallet' && liveCatalog
+            profile.payment === 'wallet' && auth.isLoggedIn
               ? 'Ưu tiên thanh toán bằng ví'
-              : !liveCatalog && profile.payment === 'card'
+              : !auth.isLoggedIn && profile.payment === 'card'
                 ? 'Ưu tiên thanh toán thẻ mẫu'
                 : 'Ưu tiên thanh toán khi nhận hàng'
           }
@@ -943,6 +970,12 @@ export function AccountScreen({
               ? 'Số dư, ngân hàng, nạp và rút tiền'
               : 'Đăng nhập để mở ví'
           }
+        />
+        <MenuItem
+          icon="mail"
+          label="Thông báo"
+          onPress={onNotifications}
+          subtitle={auth.isLoggedIn ? 'Xem cập nhật đơn hàng và tài khoản' : 'Đăng nhập để xem thông báo'}
         />
 
         <Text style={styles.menuSection}>CỬA HÀNG</Text>
@@ -972,6 +1005,14 @@ export function AccountScreen({
           onPress={() => setEditor('preferences')}
           subtitle="Cài đặt mua sắm và thông báo"
         />
+        {auth.isLoggedIn ? (
+          <MenuItem
+            icon="shield"
+            label="Đổi mật khẩu"
+            onPress={() => setPasswordEditor(true)}
+            subtitle="Bảo vệ tài khoản của bạn"
+          />
+        ) : null}
 
         {auth.isLoggedIn ? (
           <Pressable
@@ -996,14 +1037,14 @@ export function AccountScreen({
         <Text style={styles.profileNote}>
           {auth.isLoggedIn
             ? 'Phiên đăng nhập được dùng với dịch vụ Sellzy. Mật khẩu của bạn không được lưu trên thiết bị.'
-            : 'Bạn có thể mua sắm và thanh toán với tư cách khách. Đăng nhập là tùy chọn.'}
+            : 'Bạn có thể xem sản phẩm và chuẩn bị giỏ hàng. Đăng nhập để đặt hàng trực tuyến.'}
         </Text>
         <Text style={styles.version}>Sellzy Mobile · Phiên bản 1.0.0</Text>
       </ScrollView>
       {editor ? (
         <ProfileForm
           mode={editor}
-          liveCatalog={liveCatalog}
+          liveCatalog={auth.isLoggedIn}
           onClose={() => setEditor(null)}
           onSave={nextProfile => onSaveProfile(nextProfile, editor)}
           profile={profile}
@@ -1030,6 +1071,23 @@ export function AccountScreen({
           >
             <Text style={styles.continueGuestText}>Tiếp tục đăng nhập</Text>
           </Pressable>
+        </AccountDialog>
+      ) : null}
+      {passwordEditor ? (
+        <AccountDialog title="Đổi mật khẩu" onClose={() => setPasswordEditor(false)}>
+          {passwordSaved ? (
+            <>
+              <AccountNotice>Đã đổi mật khẩu. Vui lòng đăng xuất rồi đăng nhập lại bằng mật khẩu mới.</AccountNotice>
+              <AccountAction label="Đăng xuất" onPress={() => { setPasswordEditor(false); onLogout(); }} />
+            </>
+          ) : (
+            <>
+              <AccountField label="Mật khẩu hiện tại" value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry />
+              <AccountField label="Mật khẩu mới" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
+              {passwordError ? <Text style={styles.orderErrorText}>{passwordError}</Text> : null}
+              <AccountAction label={passwordSaving ? 'Đang lưu...' : 'Đổi mật khẩu'} onPress={() => { savePassword().catch(() => undefined); }} />
+            </>
+          )}
         </AccountDialog>
       ) : null}
     </View>
@@ -1289,7 +1347,7 @@ function ProfileForm({
         </>
       ) : null}
       {saveError ? <Text style={styles.formHelp}>{saveError}</Text> : null}
-      <AccountAction label={saving ? 'Đang lưu...' : 'Lưu thay đổi'} onPress={() => void save()} />
+      <AccountAction label={saving ? 'Đang lưu...' : 'Lưu thay đổi'} onPress={() => { save().catch(() => undefined); }} />
     </AccountDialog>
   );
 }
@@ -1461,40 +1519,129 @@ export function HelpScreen({
   topInset,
   onBack,
   liveCatalog = false,
+  authEmail = '',
+  profile,
 }: {
   topInset: number;
   onBack: () => void;
   liveCatalog?: boolean;
+  authEmail?: string;
+  profile?: AccountProfile;
 }) {
   const [expandedQuestion, setExpandedQuestion] = useState<number | null>(0);
-  const questions = [
+  const [faqs, setFaqs] = useState<Faq[] | null>(null);
+  const [faqError, setFaqError] = useState('');
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
+  const [ticketDetail, setTicketDetail] = useState<SupportTicketDetail | null>(null);
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [contactName, setContactName] = useState(profile?.name ?? '');
+  const [contactEmail, setContactEmail] = useState(authEmail || profile?.email || '');
+  const [replyMessage, setReplyMessage] = useState('');
+  const [sendError, setSendError] = useState('');
+  const [sendSuccess, setSendSuccess] = useState('');
+  const [sending, setSending] = useState(false);
+  useEffect(() => {
+    let active = true;
+    customerSupportApi.getFaqs().then(items => {
+      if (active) setFaqs(items);
+    }).catch(() => {
+      if (active) setFaqError('Chưa tải được câu hỏi từ cửa hàng.');
+    });
+    if (authEmail) {
+      customerSupportApi.getTickets().then(page => {
+        if (active) setTickets(page.items);
+      }).catch(() => undefined);
+    }
+    return () => { active = false; };
+  }, [authEmail]);
+  const sendSupport = async () => {
+    if (sending) return;
+    if (subject.trim().length < 3 || message.trim().length < 5) {
+      setSendError('Vui lòng nhập chủ đề và nội dung yêu cầu.');
+      return;
+    }
+    if (!authEmail && (contactName.trim().length < 2 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim()))) {
+      setSendError('Vui lòng nhập họ tên và email hợp lệ.');
+      return;
+    }
+    setSending(true);
+    setSendError('');
+    try {
+      const created = authEmail
+        ? await customerSupportApi.createTicket(subject.trim(), message.trim())
+        : await customerSupportApi.contact({
+            name: contactName.trim(),
+            email: contactEmail.trim(),
+            phone: profile?.phone || null,
+            subject: subject.trim(),
+            message: message.trim(),
+          });
+      setSubject('');
+      setMessage('');
+      setSendSuccess(`Đã gửi yêu cầu ${created.ticketNumber}.`);
+      if (authEmail) {
+        const page = await customerSupportApi.getTickets();
+        setTickets(page.items);
+      }
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : 'Không thể gửi yêu cầu hỗ trợ.');
+    } finally {
+      setSending(false);
+    }
+  };
+  const openTicket = async (id: number) => {
+    setSendError('');
+    try {
+      setTicketDetail(await customerSupportApi.getTicketDetail(id));
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : 'Không thể tải yêu cầu hỗ trợ.');
+    }
+  };
+  const sendReply = async () => {
+    if (!ticketDetail || !replyMessage.trim() || sending) return;
+    setSending(true);
+    setSendError('');
+    try {
+      await customerSupportApi.reply(ticketDetail.ticket.id, replyMessage.trim());
+      setReplyMessage('');
+      setTicketDetail(await customerSupportApi.getTicketDetail(ticketDetail.ticket.id));
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : 'Không thể gửi câu trả lời.');
+    } finally {
+      setSending(false);
+    }
+  };
+  const fallbackQuestions = [
     [
       'Tôi xem đơn hàng ở đâu?',
       liveCatalog
-        ? 'Mở Đơn hàng của tôi và chạm Chi tiết để xem bản tóm tắt đã lưu trên thiết bị. Trạng thái đơn chưa được đồng bộ tự động từ cửa hàng.'
+        ? 'Mở Đơn hàng của tôi và chạm Chi tiết để xem trạng thái đơn được cập nhật từ cửa hàng.'
         : 'Mở Đơn hàng của tôi và chạm Chi tiết để xem sản phẩm, tổng tiền cùng thông tin giao hàng đã lưu khi thanh toán. Đơn hàng được lưu trên thiết bị; phiên bản này chưa đặt giao hàng hoặc theo dõi trực tiếp.',
     ],
     [
       'Thanh toán có tạo đơn hàng thật không?',
       liveCatalog
-        ? 'Có. Sau khi đăng nhập, đơn COD được gửi đến cửa hàng. Khi không kết nối được dịch vụ, ứng dụng chuyển về danh mục mẫu và đơn mẫu chỉ lưu trên thiết bị.'
-        : 'Không. Thanh toán chỉ lưu đơn hàng mẫu trên thiết bị. Ứng dụng không gửi đơn cho cửa hàng, không thu tiền hoặc sắp xếp vận chuyển nên chưa áp dụng đổi trả, hoàn tiền.',
+        ? 'Có. Sau khi đăng nhập, đơn hàng được gửi đến cửa hàng. Ứng dụng kiểm tra lại giỏ hàng và tổng tiền trước khi đặt.'
+        : 'Chưa. Hãy kết nối lại với cửa hàng và đăng nhập để đặt hàng trực tuyến.',
     ],
     [
       'Ứng dụng hỗ trợ phương thức thanh toán nào?',
       liveCatalog
-        ? 'Đơn hàng gửi đến cửa hàng hiện hỗ trợ thanh toán khi nhận hàng. Ứng dụng không thu thập số thẻ.'
-        : 'Bạn có thể chọn thanh toán khi nhận hàng hoặc thẻ mẫu. Cả hai chỉ là lựa chọn mô phỏng; ứng dụng không thu thập số thẻ hoặc trừ tiền.',
+        ? 'Bạn có thể thanh toán khi nhận hàng hoặc dùng số dư ví Sellzy.'
+        : 'Khi kết nối cửa hàng, bạn có thể thanh toán khi nhận hàng hoặc bằng ví Sellzy.',
     ],
     [
       'Tôi dùng mã ưu đãi như thế nào?',
       liveCatalog
-        ? 'Mã SELLZY10 chỉ áp dụng cho danh mục mẫu trên thiết bị. Đơn hàng gửi đến cửa hàng hiện chưa hỗ trợ mã ưu đãi.'
-        : 'Nhập SELLZY10 trong giỏ hàng rồi chạm Áp dụng để giảm 10% giá trị sản phẩm. Hãy xem lại khoản giảm giá trong tổng tiền trước khi tiếp tục thanh toán.',
+        ? 'Nhập mã giảm giá trong giỏ hàng. Điều kiện và mức giảm sẽ được cửa hàng kiểm tra trước khi đặt đơn.'
+        : 'Kết nối lại với cửa hàng để kiểm tra mã giảm giá và báo giá thật.',
     ],
     [
       'Giỏ hàng và danh sách yêu thích có được lưu không?',
-      'Giỏ hàng, danh sách yêu thích, đơn hàng và hồ sơ được lưu riêng cho khách và từng email đăng nhập trên thiết bị này. Dữ liệu tài khoản xuất hiện khi đăng nhập lại bằng cùng email, nhưng chưa đồng bộ giữa các thiết bị. Xóa dữ liệu ứng dụng hoặc gỡ ứng dụng sẽ xóa các thông tin này.',
+      liveCatalog
+        ? 'Khi đăng nhập, giỏ hàng, yêu thích, hồ sơ và đơn hàng được đồng bộ với tài khoản. Một số tùy chọn giao diện vẫn được lưu trên thiết bị.'
+        : 'Khi mất kết nối, dữ liệu mẫu trên thiết bị không thể dùng để đặt đơn hàng thật.',
     ],
     [
       'Chức năng mua lại hoạt động thế nào?',
@@ -1505,6 +1652,9 @@ export function HelpScreen({
       'Mở Các cửa hàng rồi chạm Trở thành nhà bán hàng. Sau khi đăng nhập, nhập thông tin cửa hàng cùng liên kết giấy tờ xác minh và gửi hồ sơ để xét duyệt.',
     ],
   ];
+  const questions = faqs === null
+    ? fallbackQuestions
+    : faqs.map(item => [item.question, item.answer]);
   return (
     <View style={[sharedStyles.screen, { paddingTop: topInset }]}>
       <ScreenHeader
@@ -1527,6 +1677,8 @@ export function HelpScreen({
           </Text>
         </View>
         <Text style={styles.faqHeading}>Câu hỏi thường gặp</Text>
+        {faqError ? <Text style={styles.formHelp}>{faqError}</Text> : null}
+        {faqs?.length === 0 ? <Text style={styles.formHelp}>Chưa có câu hỏi thường gặp.</Text> : null}
         {questions.map(([question, answer], index) => (
           <View key={question} style={styles.faqCard}>
             <Pressable
@@ -1550,16 +1702,50 @@ export function HelpScreen({
           </View>
         ))}
         <View style={styles.contactCard}>
-          <Text style={styles.contactTitle}>Về trải nghiệm này</Text>
-          <Text style={styles.contactText}>
-            Sellzy là ứng dụng mua sắm mẫu với danh mục và luồng thanh toán trên
-            thiết bị.
-          </Text>
-          <Text style={styles.contactHours}>
-            Phiên bản này chưa kết nối hỗ trợ khách hàng trực tiếp.
-          </Text>
+          <Text style={styles.contactTitle}>Liên hệ hỗ trợ</Text>
+          {!authEmail ? (
+            <>
+              <AccountField label="Họ tên" value={contactName} onChangeText={setContactName} />
+              <AccountField label="Email" value={contactEmail} onChangeText={setContactEmail} keyboardType="email-address" autoCapitalize="none" />
+            </>
+          ) : null}
+          <AccountField label="Chủ đề" value={subject} onChangeText={setSubject} maxLength={255} />
+          <AccountField label="Nội dung" value={message} onChangeText={setMessage} maxLength={10000} multiline />
+          {sendError ? <Text style={styles.orderErrorText}>{sendError}</Text> : null}
+          {sendSuccess ? <Text style={styles.contactText}>{sendSuccess}</Text> : null}
+          <AccountAction label={sending ? 'Đang gửi...' : 'Gửi yêu cầu'} onPress={() => { sendSupport().catch(() => undefined); }} />
         </View>
+        {authEmail && tickets.length ? (
+          <>
+            <Text style={styles.faqHeading}>Yêu cầu của tôi</Text>
+            {tickets.map(ticket => (
+              <Pressable key={ticket.id} accessibilityRole="button" style={styles.faqCard} onPress={() => { openTicket(ticket.id).catch(() => undefined); }}>
+                <Text style={styles.faqQuestion}>{ticket.subject}</Text>
+                <Text style={styles.formHelp}>{ticket.ticketNumber} · {ticket.statusName}</Text>
+              </Pressable>
+            ))}
+          </>
+        ) : null}
       </ScrollView>
+      {ticketDetail ? (
+        <AccountDialog title={ticketDetail.ticket.subject} onClose={() => setTicketDetail(null)}>
+          <AccountNotice>{ticketDetail.ticket.ticketNumber} · {ticketDetail.ticket.statusName}</AccountNotice>
+          <Text style={styles.contactText}>{ticketDetail.ticket.description}</Text>
+          {ticketDetail.replies.map(reply => (
+            <View key={reply.id} style={styles.faqCard}>
+              <Text style={styles.faqQuestion}>{reply.senderName}</Text>
+              <Text style={styles.faqAnswer}>{reply.messageText}</Text>
+            </View>
+          ))}
+          {ticketDetail.ticket.statusName !== 'closed' ? (
+            <>
+              <AccountField label="Trả lời" value={replyMessage} onChangeText={setReplyMessage} multiline />
+              {sendError ? <Text style={styles.orderErrorText}>{sendError}</Text> : null}
+              <AccountAction label={sending ? 'Đang gửi...' : 'Gửi trả lời'} onPress={() => { sendReply().catch(() => undefined); }} />
+            </>
+          ) : null}
+        </AccountDialog>
+      ) : null}
     </View>
   );
 }

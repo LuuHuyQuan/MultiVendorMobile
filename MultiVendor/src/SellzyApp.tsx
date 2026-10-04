@@ -58,6 +58,7 @@ import {
 import HomeScreen from './screens/HomeScreen';
 import AuthScreen from './screens/AuthScreen';
 import WalletScreen from './screens/WalletScreen';
+import NotificationsScreen from './screens/NotificationsScreen';
 import SellerPortalScreen from './screens/SellerPortalScreen';
 import SellerOnboardingScreen from './screens/SellerOnboardingScreen';
 import { ProductDetailsScreen, ShopScreen } from './screens/ShopScreens';
@@ -178,7 +179,8 @@ export default function SellzyApp() {
   const wishlistReadyAccount = useRef('');
   const wishlistQueue = useRef<Promise<void>>(Promise.resolve());
   const defaultAddressId = useRef<number | null>(null);
-  const profileAvatarUrl = useRef<string | null>(null);
+  const profileAvatarUrl = useRef<string | null | undefined>(undefined);
+  const profileMutationVersion = useRef(0);
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [saveError, setSaveError] = useState(false);
@@ -357,6 +359,7 @@ export default function SellzyApp() {
 
   const saveAccountProfile = async (next: StoreData['profile'], mode: ProfileEditor) => {
     const current = dataRef.current;
+    profileMutationVersion.current += 1;
     if (!current.auth.isLoggedIn) {
       await commit(previous => ({ ...previous, profile: next }));
       setToast('Đã lưu thông tin trên thiết bị.');
@@ -364,6 +367,9 @@ export default function SellzyApp() {
     }
     const email = current.auth.email;
     if (mode === 'profile') {
+      if (profileAvatarUrl.current === undefined) {
+        profileAvatarUrl.current = (await accountApi.getProfile()).avatarUrl;
+      }
       const server = await accountApi.updateProfile({
         fullName: next.name,
         phone: next.phone || null,
@@ -380,6 +386,10 @@ export default function SellzyApp() {
         },
       }));
     } else if (mode === 'address') {
+      if (defaultAddressId.current === null) {
+        const existing = await accountApi.getAddresses();
+        defaultAddressId.current = (existing.find(address => address.isDefault) ?? existing[0])?.id ?? null;
+      }
       if (!next.address) {
         if (defaultAddressId.current !== null) {
           await accountApi.deleteAddress(defaultAddressId.current);
@@ -428,9 +438,10 @@ export default function SellzyApp() {
     if (!ready || !auth.isLoggedIn) return;
     let active = true;
     const email = auth.email;
+    const startedAtVersion = profileMutationVersion.current;
     Promise.all([accountApi.getProfile(), accountApi.getAddresses()]).then(
       async ([server, addresses]) => {
-        if (!active || !sameCartAccount(email)) return;
+        if (!active || !sameCartAccount(email) || startedAtVersion !== profileMutationVersion.current) return;
         const selected: CustomerAddress | undefined =
           addresses.find(address => address.isDefault) ?? addresses[0];
         defaultAddressId.current = selected?.id ?? null;
@@ -485,7 +496,7 @@ export default function SellzyApp() {
       pendingGuestWishlist.current = [];
       wishlistReadyAccount.current = email;
     };
-    void hydrate().catch(error => {
+    hydrate().catch(error => {
       if (sameCartAccount(email)) {
         setToast(error instanceof Error ? error.message : 'Không thể đồng bộ sản phẩm yêu thích.');
       }
@@ -500,8 +511,18 @@ export default function SellzyApp() {
     if (!sameCartAccount(email)) return;
     setServerCart({ email, cart: server });
     const remoteItems = fromServerCart(server, catalog);
+    const localItems = Object.fromEntries(
+      Object.entries(dataRef.current.cart).filter(([id]) => isRemoteCartId(id)),
+    );
+    const changed = Object.keys(localItems).length !== Object.keys(remoteItems).length ||
+      Object.entries(remoteItems).some(([id, quantity]) => localItems[id] !== quantity);
+    if (changed) {
+      setServerQuote(null);
+      checkoutAttempt.current = null;
+    }
     await commit(current => ({
       ...current,
+      coupon: changed ? '' : current.coupon,
       cart: {
         ...Object.fromEntries(Object.entries(current.cart).filter(([id]) => !isRemoteCartId(id))),
         ...remoteItems,
@@ -630,6 +651,7 @@ export default function SellzyApp() {
     }
     commit(current => ({
       ...current,
+      coupon: liveCatalog ? '' : current.coupon,
       cart: withActiveCart(
         current.cart,
         changeQuantity(
@@ -669,7 +691,7 @@ export default function SellzyApp() {
       return {
         ...current,
         cart: next,
-        coupon: Object.keys(next).length ? current.coupon : '',
+        coupon: liveCatalog || !Object.keys(next).length ? '' : current.coupon,
       };
     });
     if (liveCatalog && auth.isLoggedIn && variantId) {
@@ -702,7 +724,7 @@ export default function SellzyApp() {
       return {
         ...current,
         cart: next,
-        coupon: Object.keys(next).length ? current.coupon : '',
+        coupon: liveCatalog || !Object.keys(next).length ? '' : current.coupon,
       };
     });
     if (liveCatalog && auth.isLoggedIn && variantId) {
@@ -796,7 +818,7 @@ export default function SellzyApp() {
         }
       });
       wishlistQueue.current = job.catch(() => undefined);
-      void job.catch(async error => {
+      job.catch(async error => {
         if (!sameCartAccount(email)) return;
         try {
           const ids = await customerShoppingApi.getWishlistIds();
@@ -1102,7 +1124,7 @@ export default function SellzyApp() {
     pendingGuestWishlist.current = [];
     wishlistReadyAccount.current = '';
     defaultAddressId.current = null;
-    profileAvatarUrl.current = null;
+    profileAvatarUrl.current = undefined;
     const guest = await loadStore().catch(() => emptyStore());
     const next = { ...guest, auth: { ...defaultAuthSession } };
     dataRef.current = next;
@@ -1123,7 +1145,7 @@ export default function SellzyApp() {
     pendingGuestWishlist.current = [];
     wishlistReadyAccount.current = '';
     defaultAddressId.current = null;
-    profileAvatarUrl.current = null;
+    profileAvatarUrl.current = undefined;
     const guest = await loadStore().catch(() => emptyStore());
     const next = { ...guest, auth: { ...defaultAuthSession } };
     dataRef.current = next;
@@ -1333,7 +1355,7 @@ export default function SellzyApp() {
                   }
                 : undefined
             }
-            couponCode={coupon}
+            couponCode={liveCatalog ? serverQuote?.couponCode ?? '' : coupon}
             onApplyCoupon={applyCoupon}
             onBack={goBack}
             onCheckout={beginCheckout}
@@ -1368,7 +1390,7 @@ export default function SellzyApp() {
                   }
                 : undefined
             }
-            couponCode={coupon}
+            couponCode={liveCatalog ? serverQuote?.couponCode ?? '' : coupon}
             onBack={goBack}
             onPlaceOrder={placeOrder}
             initialDetails={{
@@ -1423,7 +1445,6 @@ export default function SellzyApp() {
           <AccountScreen
             {...shared}
             auth={auth}
-            liveCatalog={liveCatalog}
             onAuth={() => push({ name: 'auth', returnTo: 'account' })}
             onLogout={signOut}
             profile={profile}
@@ -1438,6 +1459,9 @@ export default function SellzyApp() {
                 ? push({ name: 'wallet' })
                 : push({ name: 'auth', returnTo: 'wallet' })
             }
+            onNotifications={() => auth.isLoggedIn
+              ? push({ name: 'notifications' })
+              : push({ name: 'auth', returnTo: 'account' })}
             orderCount={displayedOrders.length}
             wishlistCount={activeWishlistIds.length}
           />
@@ -1457,6 +1481,8 @@ export default function SellzyApp() {
             onRequireLogin={() => requireLogin('wallet')}
           />
         );
+      case 'notifications':
+        return <NotificationsScreen onBack={goBack} topInset={insets.top} />;
       case 'sellerPortal':
         return <SellerPortalScreen onBack={goBack} topInset={insets.top} />;
       case 'sellerOnboarding':
@@ -1480,7 +1506,7 @@ export default function SellzyApp() {
           />
         );
       case 'help':
-        return <HelpScreen liveCatalog={liveCatalog} onBack={goBack} topInset={insets.top} />;
+        return <HelpScreen liveCatalog={liveCatalog} authEmail={auth.isLoggedIn ? auth.email : ''} profile={profile} onBack={goBack} topInset={insets.top} />;
     }
   };
   const showBottomNav = rootRoutes.includes(route.name);

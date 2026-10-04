@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon, IconName } from '../components/Icon';
 import { isApiError } from '../api/errors';
+import { forgotPassword } from '../api/auth';
 import { COLORS } from '../theme';
 
 export type AuthMode = 'login' | 'register';
@@ -118,6 +119,27 @@ export function AuthScreen({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [requestError, setRequestError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [recovering, setRecovering] = useState(false);
+  const [recoveryNotice, setRecoveryNotice] = useState('');
+
+  const recover = async () => {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!emailPattern.test(cleanEmail)) {
+      setErrors(current => ({ ...current, email: 'Nhập email hợp lệ để khôi phục mật khẩu.' }));
+      return;
+    }
+    if (recovering) return;
+    setRecovering(true);
+    setRequestError('');
+    setRecoveryNotice('');
+    try {
+      setRecoveryNotice(await forgotPassword(cleanEmail));
+    } catch (error) {
+      setRequestError(error instanceof Error ? error.message : 'Không thể gửi yêu cầu khôi phục mật khẩu.');
+    } finally {
+      setRecovering(false);
+    }
+  };
 
   const clearFieldError = (field: FieldName) => {
     setErrors(current => {
@@ -365,6 +387,13 @@ export function AuthScreen({
               </Pressable>
             </AuthField>
 
+            {mode === 'login' ? (
+              <Pressable accessibilityRole="button" onPress={() => { recover().catch(() => undefined); }} style={styles.recoverButton}>
+                <Text style={styles.recoverText}>{recovering ? 'Đang gửi...' : 'Quên mật khẩu?'}</Text>
+              </Pressable>
+            ) : null}
+            {recoveryNotice ? <Text style={styles.recoveryNotice}>{recoveryNotice}</Text> : null}
+
             {requestError ? (
               <View
                 accessibilityLiveRegion="polite"
@@ -423,8 +452,8 @@ export function AuthScreen({
             </Pressable>
 
             <Text style={styles.guestNote}>
-              Bạn vẫn có thể xem, lưu yêu thích và mua sắm mà không cần đăng
-              nhập.
+              Bạn có thể xem sản phẩm, lưu yêu thích và chuẩn bị giỏ hàng.
+              Đăng nhập để đặt hàng.
             </Text>
           </View>
         </View>
@@ -511,6 +540,9 @@ function AuthField({
 }
 
 const styles = StyleSheet.create({
+  recoverButton: { alignSelf: 'flex-end', paddingVertical: 9 },
+  recoverText: { color: COLORS.teal, fontWeight: '800' },
+  recoveryNotice: { color: COLORS.tealDark, marginTop: 8, lineHeight: 20 },
   screen: { flex: 1, backgroundColor: COLORS.surface },
   scrollContent: { flexGrow: 1, backgroundColor: COLORS.surface },
   hero: {

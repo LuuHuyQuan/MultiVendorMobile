@@ -443,16 +443,10 @@ export default function WalletScreen({
         bankAccountId: selectedBank.id,
         idempotencyKey: key,
       };
-      const created =
-        moneyMode === 'top_up'
-          ? await walletApi.requestTopUp(request)
-          : await walletApi.requestWithdrawal(request);
+      if (moneyMode === 'top_up') await walletApi.requestTopUp(request);
+      else await walletApi.requestWithdrawal(request);
       pendingMoneyRequestRef.current = null;
       setAmount('');
-      setTransactions(current => [
-        created,
-        ...current.filter(entry => entry.id !== created.id),
-      ]);
       setNotice(
         moneyMode === 'top_up'
           ? 'Đã tạo yêu cầu nạp tiền. Số dư sẽ tăng sau khi khoản nạp được xác nhận.'
