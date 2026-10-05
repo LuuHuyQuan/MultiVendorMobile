@@ -73,7 +73,7 @@ function getFriendlyError(error: unknown, mode: AuthMode) {
     lowerMessage.includes('offline') ||
     lowerMessage.includes('failed to fetch')
   ) {
-    return 'Kiểm tra kết nối internet rồi thử lại.';
+    return 'Không kết nối được máy chủ. Vui lòng tải lại trang rồi thử lại.';
   }
 
   if (

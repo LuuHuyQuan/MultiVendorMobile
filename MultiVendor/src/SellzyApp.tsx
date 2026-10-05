@@ -171,6 +171,7 @@ export default function SellzyApp() {
   const [catalogAttempt, setCatalogAttempt] = useState(0);
   const [serverQuote, setServerQuote] = useState<ShopQuote | null>(null);
   const [serverCart, setServerCart] = useState<{ email: string; cart: ShopCart } | null>(null);
+  const [accountAddresses, setAccountAddresses] = useState<{ email: string; items: CustomerAddress[] } | null>(null);
   const hydratedAccount = useRef('');
   const cartReadyAccount = useRef('');
   const pendingGuestCart = useRef<StoreData['cart']>({});
@@ -339,6 +340,15 @@ export default function SellzyApp() {
     };
   }, [catalogAttempt]);
 
+  // Auto-retry khi catalog lỗi, sau 5 giây
+  useEffect(() => {
+    if (!catalogError || remoteCatalog) return;
+    const retryTimer = setTimeout(() => {
+      setCatalogAttempt(value => value + 1);
+    }, 5000);
+    return () => clearTimeout(retryTimer);
+  }, [catalogError, remoteCatalog]);
+
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(''), 2500);
@@ -356,6 +366,42 @@ export default function SellzyApp() {
   };
   const sameCartAccount = (email: string) =>
     dataRef.current.auth.isLoggedIn && dataRef.current.auth.email === email;
+
+  const applyAccountAddresses = async (items: CustomerAddress[], email: string) => {
+    if (!sameCartAccount(email)) return;
+    const selected = items.find(address => address.isDefault) ?? items[0];
+    defaultAddressId.current = selected?.id ?? null;
+    setAccountAddresses({ email, items });
+    await commit(previous => ({
+      ...previous,
+      profile: {
+        ...previous.profile,
+        recipientName: selected?.recipientName ?? '',
+        recipientPhone: selected?.phone ?? '',
+        address: selected?.addressLine1 ?? '',
+        district: selected?.district ?? '',
+        city: selected?.city ?? '',
+      },
+    }));
+  };
+
+  const selectAccountAddress = async (id: number) => {
+    const email = dataRef.current.auth.email;
+    if (!sameCartAccount(email)) throw new Error('Vui lòng đăng nhập để chọn địa chỉ.');
+    profileMutationVersion.current += 1;
+    await accountApi.setDefaultAddress(id);
+    await applyAccountAddresses(await accountApi.getAddresses(), email);
+    setToast('Đã chọn địa chỉ giao hàng mặc định.');
+  };
+
+  const deleteAccountAddress = async (id: number) => {
+    const email = dataRef.current.auth.email;
+    if (!sameCartAccount(email)) throw new Error('Vui lòng đăng nhập để xóa địa chỉ.');
+    profileMutationVersion.current += 1;
+    await accountApi.deleteAddress(id);
+    await applyAccountAddresses(await accountApi.getAddresses(), email);
+    setToast('Đã xóa địa chỉ giao hàng.');
+  };
 
   const saveAccountProfile = async (next: StoreData['profile'], mode: ProfileEditor) => {
     const current = dataRef.current;
@@ -385,13 +431,13 @@ export default function SellzyApp() {
           email: server.email,
         },
       }));
-    } else if (mode === 'address') {
+    } else if (mode === 'address' || mode === 'address-new') {
       if (defaultAddressId.current === null) {
         const existing = await accountApi.getAddresses();
         defaultAddressId.current = (existing.find(address => address.isDefault) ?? existing[0])?.id ?? null;
       }
       if (!next.address) {
-        if (defaultAddressId.current !== null) {
+        if (mode === 'address' && defaultAddressId.current !== null) {
           await accountApi.deleteAddress(defaultAddressId.current);
         }
       } else {
@@ -405,7 +451,7 @@ export default function SellzyApp() {
           countryCode: 'VN',
           isDefault: true,
         };
-        if (defaultAddressId.current !== null) {
+        if (mode === 'address' && defaultAddressId.current !== null) {
           await accountApi.updateAddress(defaultAddressId.current, request);
         } else {
           await accountApi.addAddress(request);
@@ -413,19 +459,7 @@ export default function SellzyApp() {
       }
       const addresses = await accountApi.getAddresses();
       if (!sameCartAccount(email)) return;
-      const selected = addresses.find(address => address.isDefault) ?? addresses[0];
-      defaultAddressId.current = selected?.id ?? null;
-      await commit(previous => ({
-        ...previous,
-        profile: {
-          ...previous.profile,
-          recipientName: selected?.recipientName ?? '',
-          recipientPhone: selected?.phone ?? '',
-          address: selected?.addressLine1 ?? '',
-          district: selected?.district ?? '',
-          city: selected?.city ?? '',
-        },
-      }));
+      await applyAccountAddresses(addresses, email);
     } else {
       await commit(previous => ({ ...previous, profile: next }));
     }
@@ -446,6 +480,7 @@ export default function SellzyApp() {
           addresses.find(address => address.isDefault) ?? addresses[0];
         defaultAddressId.current = selected?.id ?? null;
         profileAvatarUrl.current = server.avatarUrl;
+        setAccountAddresses({ email, items: addresses });
         await commit(previous => ({
           ...previous,
           profile: {
@@ -1117,6 +1152,7 @@ export default function SellzyApp() {
     setRemoteOrdersState(null);
     setServerQuote(null);
     setServerCart(null);
+    setAccountAddresses(null);
     checkoutAttempt.current = null;
     hydratedAccount.current = '';
     cartReadyAccount.current = '';
@@ -1138,6 +1174,7 @@ export default function SellzyApp() {
     setRemoteOrdersState(null);
     setServerQuote(null);
     setServerCart(null);
+    setAccountAddresses(null);
     checkoutAttempt.current = null;
     hydratedAccount.current = '';
     cartReadyAccount.current = '';
@@ -1448,6 +1485,9 @@ export default function SellzyApp() {
             onAuth={() => push({ name: 'auth', returnTo: 'account' })}
             onLogout={signOut}
             profile={profile}
+            addresses={accountAddresses?.email === auth.email ? accountAddresses.items : []}
+            onSelectAddress={selectAccountAddress}
+            onDeleteAddress={deleteAccountAddress}
             onSaveProfile={saveAccountProfile}
             onHelp={() => push({ name: 'help' })}
             onOrders={() => goRoot('orders')}
@@ -1482,7 +1522,12 @@ export default function SellzyApp() {
           />
         );
       case 'notifications':
-        return <NotificationsScreen onBack={goBack} topInset={insets.top} />;
+        return <NotificationsScreen onBack={goBack} topInset={insets.top} onOpenAction={url => {
+          if (url?.startsWith('/orders')) goRoot('orders');
+          else if (url?.startsWith('/support')) push({ name: 'help' });
+          else if (url?.startsWith('/account')) goRoot('account');
+          else if (url?.startsWith('/wallet')) push({ name: 'wallet' });
+        }} />;
       case 'sellerPortal':
         return <SellerPortalScreen onBack={goBack} topInset={insets.top} />;
       case 'sellerOnboarding':
@@ -1515,24 +1560,7 @@ export default function SellzyApp() {
       <StatusBar
         barStyle={route.name === 'home' ? 'light-content' : 'dark-content'}
       />
-      {catalogError && !remoteCatalog ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setCatalogAttempt(value => value + 1)}
-          style={styles.catalogWarning}
-        >
-          <Text style={styles.catalogWarningText}>
-            Đang dùng danh mục mẫu trên thiết bị. Chạm để kết nối lại cửa hàng.
-          </Text>
-        </Pressable>
-      ) : null}
-      {remoteCatalog && hasDemoCart ? (
-        <View style={styles.catalogWarning}>
-          <Text style={styles.catalogWarningText}>
-            Giỏ hàng mẫu còn sản phẩm. Hoàn tất hoặc xóa giỏ để chuyển sang cửa hàng trực tuyến.
-          </Text>
-        </View>
-      ) : null}
+
       <View
         key={route.key ?? route.name}
         style={[

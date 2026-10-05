@@ -5,7 +5,7 @@ import { Icon } from '../components/Icon';
 import { ScreenHeader, sharedStyles } from '../components/SellzyUI';
 import { COLORS } from '../theme';
 
-export default function NotificationsScreen({ topInset, onBack }: { topInset: number; onBack: () => void }) {
+export default function NotificationsScreen({ topInset, onBack, onOpenAction }: { topInset: number; onBack: () => void; onOpenAction: (url: string | null) => void }) {
   const [items, setItems] = useState<MyNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -61,11 +61,11 @@ export default function NotificationsScreen({ topInset, onBack }: { topInset: nu
         {!loading && !items.length ? <Text style={styles.empty}>Bạn chưa có thông báo nào.</Text> : null}
         {items.map(item => (
           <View key={item.id} style={[styles.card, !item.isRead && styles.unread]}>
-            <Pressable accessibilityRole="button" onPress={() => { read(item).catch(() => undefined); }} style={styles.cardBody}>
+            <Pressable accessibilityRole="button" onPress={() => { read(item).then(() => onOpenAction(item.actionUrl)).catch(() => undefined); }} style={styles.cardBody}>
               <Text style={styles.title}>{item.title}</Text>
               <Text style={styles.message}>{item.message}</Text>
               <Text style={styles.date}>{new Date(item.createdAt).toLocaleString('vi-VN')}</Text>
-              {!item.isRead ? <Text style={styles.hint}>Chạm để đánh dấu đã đọc</Text> : null}
+              {!item.isRead ? <Text style={styles.hint}>{item.actionUrl ? 'Chạm để xem và đánh dấu đã đọc' : 'Chạm để đánh dấu đã đọc'}</Text> : null}
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={`Xóa thông báo ${item.title}`} onPress={() => { remove(item).catch(() => undefined); }} style={styles.delete}><Icon name="trash" color={COLORS.red} size={18} /></Pressable>
           </View>

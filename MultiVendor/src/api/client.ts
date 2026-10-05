@@ -12,16 +12,18 @@ import type { AuthTokenResponse, StoredAuthSession } from './types';
 declare const process: {
   env: {
     EXPO_PUBLIC_API_BASE_URL?: string;
+    EXPO_PUBLIC_WEB_API_BASE_URL?: string;
   };
 };
 
 const platformBaseUrl = Platform.select({
-  web: 'http://localhost:5027/api',
+  web: '/api',
   android: 'http://10.0.2.2:5027/api',
   default: 'http://localhost:5027/api',
 });
 
 export const API_BASE_URL = (
+  (Platform.OS === 'web' ? process.env.EXPO_PUBLIC_WEB_API_BASE_URL?.trim() : undefined) ||
   process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || platformBaseUrl
 ).replace(/\/+$/, '');
 

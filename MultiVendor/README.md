@@ -11,7 +11,7 @@
 - Xem đánh giá thật của sản phẩm; người mua đã nhận hàng có thể gửi hoặc sửa đánh giá.
 - Đăng ký, đăng nhập/đăng xuất qua API; access token được tự làm mới. Dữ liệu mua sắm được lưu riêng cho khách và từng email đăng nhập trên thiết bị.
 - Ví cá nhân đồng bộ với back-end: số dư khả dụng/tạm giữ, liên kết tài khoản ngân hàng, nạp tiền, rút tiền, lịch sử thanh toán và hoàn tiền.
-- Hồ sơ, địa chỉ mặc định, đổi và khôi phục mật khẩu, thông báo, câu hỏi thường gặp và hỗ trợ khách hàng dùng API. Liên kết khôi phục mật khẩu được gửi qua email và mở trang web.
+- Hồ sơ, nhiều địa chỉ giao hàng, đổi và khôi phục mật khẩu, thông báo, câu hỏi thường gặp và hỗ trợ khách hàng dùng API. Liên kết khôi phục mật khẩu được gửi qua email và mở trang web.
 - Danh sách nhà bán và biểu mẫu gửi hồ sơ đăng ký nhà bán qua API; xem trạng thái duyệt và gửi lại hồ sơ bị từ chối.
 - Kênh người bán cho tài khoản có cửa hàng đang hoạt động: tổng quan, gửi sản phẩm chờ duyệt, gửi lại sản phẩm bị từ chối và cập nhật tiến trình đơn hàng theo quyền API.
 - Khi không kết nối được back-end, ứng dụng có thể hiển thị danh mục mẫu trên thiết bị; thao tác đặt đơn được chặn cho đến khi kết nối lại.
@@ -28,6 +28,20 @@
 - macOS cùng Xcode và CocoaPods để chạy iOS.
 
 ## Chạy ứng dụng
+
+### Chạy đồng thời API, web và mobile
+
+Trong thư mục này chạy:
+
+```powershell
+.\scripts\Start-All.ps1 -OpenBrowser
+```
+
+Lệnh gọi launcher của dự án `MultiVendorEcommercePlatform` bên cạnh, khởi động API, web ở cổng 5173 và giao diện mobile Expo web ở cổng 8081. Hai client dùng cùng API/CSDL. Launcher chọn IP LAN hiện tại và truyền API URL vào tiến trình Expo; không ghi bí mật vào cấu hình mobile. `-OpenBrowser` mở cả hai trong Microsoft Edge; `-LocalOnly` giới hạn truy cập trên PC. Dừng cả ba bằng `.\scripts\Stop-All.ps1` trước khi debug API bằng Visual Studio.
+
+Expo web gọi `/api` và `/uploads` qua proxy Metro trên chính địa chỉ web, tránh gọi từ `localhost` sang IP LAN hoặc yêu cầu trình duyệt tin chứng chỉ localhost. `EXPO_PUBLIC_WEB_API_BASE_URL=/api` dành cho web; `EXPO_PUBLIC_API_BASE_URL` dành cho native. Đích proxy `API_PROXY_TARGET` chỉ được đọc bởi máy chủ Metro, mặc định `http://127.0.0.1:5027`. Khi triển khai bản web riêng, reverse proxy cũng phải chuyển `/api` và `/uploads` tới API, hoặc đặt `EXPO_PUBLIC_WEB_API_BASE_URL` thành URL API HTTPS và cấu hình CORS tương ứng.
+
+Bản Expo web dùng để xem giao diện React Native trên trình duyệt. Chạy APK Android cần SDK/emulator hoặc điện thoại thật, còn iOS cần macOS/Xcode.
 
 ```powershell
 cd MultiVendor
@@ -64,7 +78,7 @@ Copy-Item .env.example .env
 - Android emulator: `EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:5027/api`.
 - Thiết bị thật: dùng địa chỉ IP LAN của máy chạy back-end, ví dụ `http://192.168.1.10:5027/api`.
 
-Nếu không tạo `.env`, ứng dụng tự dùng HTTP localhost cho web và địa chỉ emulator cho Android. Cần khởi động back-end ASP.NET của dự án `MultiVendorEcommercePlatform` trước khi dùng các chức năng trực tuyến. Sau khi đổi `.env`, hãy khởi động lại Expo.
+Nếu để `EXPO_PUBLIC_API_BASE_URL` trống, Android dùng địa chỉ emulator `10.0.2.2:5027`; Expo web vẫn dùng `/api` qua Metro theo biến `EXPO_PUBLIC_WEB_API_BASE_URL`. Thiết bị Android/iOS thật cần IP LAN hoặc URL HTTPS trong biến native, hoặc chạy bằng launcher chung để Expo nhận địa chỉ phù hợp. Cần khởi động back-end ASP.NET của dự án `MultiVendorEcommercePlatform` trước khi dùng các chức năng trực tuyến. Sau khi đổi `.env`, tải lại ứng dụng.
 
 Để mở Expo CLI cho Android/iOS, dùng `npm run start:expo:native`.
 

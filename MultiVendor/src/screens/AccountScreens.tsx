@@ -17,6 +17,7 @@ import type {
 } from '../api/customerOrders';
 import { customerSupportApi, type Faq, type SupportTicket, type SupportTicketDetail } from '../api/customerSupport';
 import { accountApi } from '../api/account';
+import type { CustomerAddress } from '../api/account';
 
 import {
   AccountProfile,
@@ -798,9 +799,12 @@ type AccountProps = {
   orderCount: number;
   auth: AuthSession;
   profile: AccountProfile;
+  addresses: CustomerAddress[];
   onAuth: () => void;
   onLogout: () => void;
   onSaveProfile: (profile: AccountProfile, mode: ProfileEditor) => Promise<void>;
+  onSelectAddress: (id: number) => Promise<void>;
+  onDeleteAddress: (id: number) => Promise<void>;
   onCart: () => void;
   onOrders: () => void;
   onWishlist: () => void;
@@ -818,9 +822,12 @@ export function AccountScreen({
   orderCount,
   auth,
   profile,
+  addresses,
   onAuth,
   onLogout,
   onSaveProfile,
+  onSelectAddress,
+  onDeleteAddress,
   onCart,
   onOrders,
   onWishlist,
@@ -832,6 +839,23 @@ export function AccountScreen({
 }: AccountProps) {
   const [editor, setEditor] = useState<ProfileEditor | null>(null);
   const [showLogout, setShowLogout] = useState(false);
+  const [addressDialog, setAddressDialog] = useState(false);
+  const [addressBusy, setAddressBusy] = useState(false);
+  const [addressError, setAddressError] = useState('');
+  const [deleteCandidate, setDeleteCandidate] = useState<number | null>(null);
+  const runAddressAction = async (task: () => Promise<void>) => {
+    if (addressBusy) return;
+    setAddressBusy(true);
+    setAddressError('');
+    try {
+      await task();
+      setDeleteCandidate(null);
+    } catch (error) {
+      setAddressError(error instanceof Error ? error.message : 'Không thể cập nhật địa chỉ.');
+    } finally {
+      setAddressBusy(false);
+    }
+  };
   const [passwordEditor, setPasswordEditor] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -940,7 +964,7 @@ export function AccountScreen({
         <MenuItem
           icon="pin"
           label="Địa chỉ giao hàng"
-          onPress={() => setEditor('address')}
+          onPress={() => auth.isLoggedIn ? setAddressDialog(true) : setEditor('address')}
           subtitle={
             profile.address
               ? [profile.address, profile.district, profile.city]
@@ -1050,6 +1074,37 @@ export function AccountScreen({
           profile={profile}
         />
       ) : null}
+      {addressDialog ? (
+        <AccountDialog title="Địa chỉ giao hàng" onClose={() => { setAddressDialog(false); setDeleteCandidate(null); }}>
+          <AccountNotice>Chọn địa chỉ mặc định để điền nhanh khi thanh toán.</AccountNotice>
+          {!addresses.length ? <Text style={styles.formHelp}>Bạn chưa lưu địa chỉ nào.</Text> : null}
+          {addresses.map(address => (
+            <View key={address.id} style={styles.faqCard}>
+              <Text style={styles.faqQuestion}>{address.label}{address.isDefault ? ' · Mặc định' : ''}</Text>
+              <Text style={styles.faqAnswer}>{address.recipientName} · {address.phone}</Text>
+              <Text style={styles.formHelp}>{[address.addressLine1, address.district, address.city].filter(Boolean).join(', ')}</Text>
+              {!address.isDefault ? (
+                <Pressable accessibilityRole="button" onPress={() => { runAddressAction(() => onSelectAddress(address.id)).catch(() => undefined); }}>
+                  <Text style={styles.contactText}>{addressBusy ? 'Đang lưu...' : 'Chọn làm mặc định'}</Text>
+                </Pressable>
+              ) : null}
+              <Pressable accessibilityRole="button" onPress={() => setDeleteCandidate(address.id)}>
+                <Text style={styles.orderErrorText}>Xóa địa chỉ</Text>
+              </Pressable>
+              {deleteCandidate === address.id ? (
+                <View>
+                  <Text style={styles.formHelp}>Xác nhận xóa địa chỉ này?</Text>
+                  <AccountAction label={addressBusy ? 'Đang xóa...' : 'Xác nhận xóa'} onPress={() => { runAddressAction(() => onDeleteAddress(address.id)).catch(() => undefined); }} />
+                  <Pressable accessibilityRole="button" onPress={() => setDeleteCandidate(null)}><Text style={styles.formHelp}>Giữ lại địa chỉ</Text></Pressable>
+                </View>
+              ) : null}
+            </View>
+          ))}
+          {addressError ? <Text style={styles.orderErrorText}>{addressError}</Text> : null}
+          <AccountAction label="Thêm địa chỉ" onPress={() => { setAddressDialog(false); setEditor('address-new'); }} />
+          {addresses.length ? <AccountAction label="Sửa địa chỉ mặc định" onPress={() => { setAddressDialog(false); setEditor('address'); }} /> : null}
+        </AccountDialog>
+      ) : null}
       {showLogout ? (
         <AccountDialog onClose={() => setShowLogout(false)} title="Đăng xuất?">
           <AccountNotice>
@@ -1094,11 +1149,12 @@ export function AccountScreen({
   );
 }
 
-export type ProfileEditor = 'profile' | 'address' | 'payment' | 'preferences';
+export type ProfileEditor = 'profile' | 'address' | 'address-new' | 'payment' | 'preferences';
 
 const editorTitles: Record<ProfileEditor, string> = {
   profile: 'Chỉnh sửa hồ sơ',
   address: 'Địa chỉ giao hàng',
+  'address-new': 'Thêm địa chỉ giao hàng',
   payment: 'Ưu tiên thanh toán',
   preferences: 'Tùy chọn',
 };
@@ -1118,8 +1174,11 @@ function ProfileForm({
 }) {
   const [draft, setDraft] = useState<AccountProfile>(() => ({
     ...profile,
-    recipientName: profile.recipientName || profile.name,
-    recipientPhone: profile.recipientPhone || profile.phone,
+    recipientName: mode === 'address-new' ? profile.name : profile.recipientName || profile.name,
+    recipientPhone: mode === 'address-new' ? profile.phone : profile.recipientPhone || profile.phone,
+    address: mode === 'address-new' ? '' : profile.address,
+    district: mode === 'address-new' ? '' : profile.district,
+    city: mode === 'address-new' ? '' : profile.city,
     payment: liveCatalog && profile.payment === 'card' ? 'cash' : profile.payment,
   }));
   const [saving, setSaving] = useState(false);
@@ -1159,23 +1218,20 @@ function ProfileForm({
         nextErrors.phone = 'Nhập số điện thoại hợp lệ hoặc để trống.';
       }
     }
-    if (mode === 'address') {
-      const hasAddress = Boolean(
-        cleaned.address || cleaned.district || cleaned.city,
-      );
-      if (hasAddress && cleaned.address.length < 5) {
+    if (mode === 'address' || mode === 'address-new') {
+      if (cleaned.address.length < 5) {
         nextErrors.address = 'Vui lòng nhập địa chỉ có ít nhất 5 ký tự.';
       }
-      if (hasAddress && cleaned.district.length < 2) {
+      if (cleaned.district.length < 2) {
         nextErrors.district = 'Vui lòng nhập quận/huyện.';
       }
-      if (hasAddress && cleaned.city.length < 2) {
+      if (cleaned.city.length < 2) {
         nextErrors.city = 'Vui lòng nhập tỉnh/thành phố.';
       }
-      if (hasAddress && cleaned.recipientName.length < 2) {
+      if (cleaned.recipientName.length < 2) {
         nextErrors.recipientName = 'Vui lòng nhập tên người nhận.';
       }
-      if (hasAddress && !/^\+?[\d\s().-]{7,20}$/.test(cleaned.recipientPhone)) {
+      if (!/^\+?[\d\s().-]{7,20}$/.test(cleaned.recipientPhone)) {
         nextErrors.recipientPhone = 'Vui lòng nhập số điện thoại người nhận.';
       }
     }
@@ -1235,12 +1291,12 @@ function ProfileForm({
           />
         </>
       ) : null}
-      {mode === 'address' ? (
+      {mode === 'address' || mode === 'address-new' ? (
         <>
           <AccountNotice>
-            Địa chỉ mặc định sẽ được điền khi thanh toán. Bạn có thể xem lại
-            hoặc thay đổi trước khi lưu đơn hàng. Để trống cả hai trường để xóa
-            địa chỉ đã lưu.
+            {mode === 'address-new'
+              ? 'Địa chỉ mới sẽ được chọn làm mặc định để điền khi thanh toán.'
+              : 'Địa chỉ mặc định sẽ được điền khi thanh toán. Bạn có thể thay đổi trước khi đặt hàng.'}
           </AccountNotice>
           <AccountField
             autoCapitalize="words"

@@ -1,4 +1,5 @@
 import { API_BASE_URL } from '../api/client';
+import { resolveApiImageUrl } from '../api/media';
 import {
   storefrontApi,
   type StorefrontCategory,
@@ -17,17 +18,10 @@ export type LiveCatalog = {
 };
 
 const imageFallback = require('../assets/logo.png');
-const imageOrigin = API_BASE_URL.replace(/\/api\/?$/i, '');
 
 const imageSource = (path: string | null | undefined) => {
-  if (!path) return imageFallback;
-  const trimmed = path.trim();
-  const url = /^https?:\/\//i.test(trimmed)
-    ? trimmed
-    : trimmed.startsWith('//')
-    ? `${imageOrigin.startsWith('https:') ? 'https:' : 'http:'}${trimmed}`
-    : `${imageOrigin}/${trimmed.replace(/^\/+/, '')}`;
-  return { uri: url };
+  if (!path?.trim()) return imageFallback;
+  return { uri: resolveApiImageUrl(path, API_BASE_URL) };
 };
 
 const variantLabel = (name: string, variantName: string) =>
