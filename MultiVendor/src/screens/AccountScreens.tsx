@@ -17,6 +17,8 @@ import type {
 } from '../api/customerOrders';
 import { customerSupportApi, type Faq, type SupportTicket, type SupportTicketDetail } from '../api/customerSupport';
 import { accountApi } from '../api/account';
+import { API_BASE_URL } from '../api/client';
+import { resolveApiImageUrl } from '../api/media';
 import type { CustomerAddress } from '../api/account';
 
 import {
@@ -31,8 +33,9 @@ import {
 } from '../components/SellzyUI';
 import { Icon, IconName } from '../components/Icon';
 import { products, sellers } from '../data/catalog';
+import { baseProductId } from '../data/liveCatalog';
 import { COLORS, money } from '../theme';
-import type { Order, Product } from '../types';
+import type { Order, OrderProductPreview, Product } from '../types';
 import {
   AccountAction,
   AccountDialog,
@@ -107,6 +110,48 @@ const orderStatusLabel = (name?: string) => {
     default: return name || 'Đang xử lý';
   }
 };
+
+function OrderProductThumbnail({
+  preview,
+  product,
+  onOpenProduct,
+}: {
+  preview: OrderProductPreview;
+  product?: Product;
+  onOpenProduct: (id: string) => void;
+}) {
+  const [imageStage, setImageStage] = useState<'preview' | 'catalog' | 'missing'>('preview');
+  useEffect(() => { setImageStage('preview'); }, [preview.imageUrl, product?.image]);
+  const previewSource = preview.imageUrl?.trim()
+    ? { uri: resolveApiImageUrl(preview.imageUrl, API_BASE_URL) }
+    : undefined;
+  const usesPreview = !!previewSource && imageStage === 'preview';
+  const source = imageStage === 'missing'
+    ? undefined : usesPreview ? previewSource : product?.image;
+  const thumbnail = source ? (
+    <Image
+      accessibilityLabel={preview.name}
+      onError={() => setImageStage(usesPreview ? 'catalog' : 'missing')}
+      source={source}
+      resizeMode="contain"
+      style={styles.orderProductImage}
+    />
+  ) : <Icon color={COLORS.muted} name="shop" size={20} />;
+  return product ? (
+    <Pressable
+      accessibilityLabel={`Xem ${preview.name}`}
+      accessibilityRole="button"
+      onPress={() => onOpenProduct(product.id)}
+      style={styles.orderProductImageWrap}
+    >
+      {thumbnail}
+    </Pressable>
+  ) : (
+    <View accessibilityLabel={preview.name} style={styles.orderProductImageWrap}>
+      {thumbnail}
+    </View>
+  );
+}
 
 export function OrdersScreen({
   topInset,
@@ -188,10 +233,7 @@ export function OrdersScreen({
           {orders.map(order => (
             <View key={order.id} style={styles.orderCard}>
               <View style={styles.orderTop}>
-                <View>
-                  <Text style={styles.orderLabel}>ĐƠN HÀNG {order.id}</Text>
-                  <Text style={styles.orderDate}>{order.date}</Text>
-                </View>
+                <Text style={styles.orderLabel}>ĐƠN HÀNG</Text>
                 <View
                   style={[
                     styles.statusBadge,
@@ -217,38 +259,35 @@ export function OrdersScreen({
                   </Text>
                 </View>
               </View>
-              {order.productIds.length ? <View style={styles.orderProducts}>
-                {order.productIds.slice(0, 4).map(id => {
-                  const product =
+              <Text
+                accessibilityLabel={`Mã đơn hàng ${order.id}`}
+                ellipsizeMode="middle"
+                numberOfLines={1}
+                style={styles.orderNumber}
+              >
+                {order.id}
+              </Text>
+              <Text style={styles.orderDate}>{order.date}</Text>
+              <View style={styles.orderProducts}>
+                {(order.productPreviews ?? order.productIds.map(id => ({
+                  productId: id,
+                  name: order.lines?.find(line => line.productId === id)?.name ?? 'Sản phẩm trong đơn hàng',
+                  imageUrl: null,
+                }))).slice(0, 4).map((preview, index) => {
+                  const id = preview.productId;
+                  const product = id === null ? undefined :
                     catalogProducts.find(item => item.id === id) ??
-                    (order.simulated !== false
-                      ? products.find(item => item.id === id)
-                      : undefined);
-                  return product ? (
-                    <Pressable
-                      accessibilityLabel={`Xem ${product.name}`}
-                      accessibilityRole="button"
-                      key={id}
-                      onPress={() => onOpenProduct(id)}
-                      style={styles.orderProductImageWrap}
-                    >
-                      <Image
-                        source={product.image}
-                        resizeMode="contain"
-                        style={styles.orderProductImage}
-                      />
-                    </Pressable>
-                  ) : (
-                    <View
-                      accessibilityLabel="Sản phẩm không còn trong danh mục"
-                      key={id}
-                      style={styles.orderProductImageWrap}
-                    >
-                      <Icon color={COLORS.muted} name="shop" size={20} />
-                    </View>
+                    catalogProducts.find(item => item.id === baseProductId(id));
+                  return (
+                    <OrderProductThumbnail
+                      key={`${id}:${index}`}
+                      preview={preview}
+                      product={product}
+                      onOpenProduct={onOpenProduct}
+                    />
                   );
                 })}
-              </View> : null}
+              </View>
               <View style={styles.orderBottom}>
                 <View>
                   <Text style={styles.orderItems}>
@@ -330,7 +369,8 @@ function OrderDetails({
     );
   }
   return (
-    <AccountDialog onClose={onClose} subtitle={order.date} title={order.id}>
+    <AccountDialog onClose={onClose} subtitle={order.date} title="Chi tiết đơn hàng">
+      <Text selectable style={styles.orderDetailNumber}>Mã đơn hàng: {order.id}</Text>
       <AccountNotice>
         {order.simulated === false
           ? 'Đơn đã được gửi tới cửa hàng. Đây là bản tóm tắt lưu trên thiết bị; trạng thái và lịch sử giao hàng chưa được đồng bộ tự động.'
@@ -533,7 +573,8 @@ function ServerOrderDetails({
   };
 
   return (
-    <AccountDialog onClose={onClose} subtitle={order.date} title={order.id}>
+    <AccountDialog onClose={onClose} subtitle={order.date} title="Chi tiết đơn hàng">
+      <Text selectable style={styles.orderDetailNumber}>Mã đơn hàng: {order.id}</Text>
       {loading ? (
         <View style={styles.orderLoading}>
           <ActivityIndicator color={COLORS.teal} />
@@ -1903,11 +1944,16 @@ const styles = StyleSheet.create({
   orderTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: 8,
   },
-  orderLabel: { color: COLORS.ink, fontSize: 12, fontWeight: '900' },
+  orderLabel: { color: COLORS.ink, fontSize: 12, fontWeight: '900', flexShrink: 1 },
+  orderNumber: { color: COLORS.ink, fontSize: 12, fontWeight: '700', marginTop: 8 },
+  orderDetailNumber: { color: COLORS.ink, fontSize: 13, lineHeight: 20, marginBottom: 12 },
   orderDate: { color: COLORS.muted, fontSize: 12, marginTop: 4 },
   statusBadge: {
+    flexShrink: 1,
+    maxWidth: '70%',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 12,
@@ -1916,7 +1962,7 @@ const styles = StyleSheet.create({
   statusDelivered: { backgroundColor: '#E7F7EE' },
   statusText: { color: '#8B6A00', fontSize: 11, fontWeight: '900' },
   statusDeliveredText: { color: COLORS.success },
-  orderProducts: { flexDirection: 'row', gap: 8, marginVertical: 15 },
+  orderProducts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: 15 },
   orderProductImageWrap: {
     width: 61,
     height: 61,

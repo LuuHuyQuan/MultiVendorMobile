@@ -11,6 +11,11 @@ export type CustomerOrderSummary = {
   placedAt: string;
   itemCount: number;
   paymentMethod: string;
+  productPreviews?: {
+    productId: number | null;
+    productName: string;
+    imageUrl: string | null;
+  }[];
 };
 
 export type CustomerOrder = Omit<CustomerOrderSummary, 'itemCount' | 'paymentMethod'> & {

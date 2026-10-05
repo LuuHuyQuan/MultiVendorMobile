@@ -11,6 +11,14 @@ export function resolveApiImageUrl(path: string, apiBaseUrl: string): string {
   }
   if (/^https?:\/\//i.test(trimmed)) {
     const url = new URL(trimmed);
+    // Placehold defaults to SVG, which native Image cannot decode. Request
+    // its raster format while preserving dimensions, colours and query text.
+    if (url.hostname.toLowerCase() === 'placehold.co') {
+      const rasterPath = `${url.pathname.replace(/(?:\/|\.)(?:svg|png|jpe?g|gif|webp|avif)\/?$/i, '').replace(/\/$/, '')}/png`;
+      const query = url.search.slice(1).split('&')
+        .filter(parameter => !/^format(?:=|$)/i.test(parameter)).join('&');
+      return `${url.origin}${rasterPath}${query ? `?${query}` : ''}${url.hash}`;
+    }
     if (
       ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname.toLowerCase()) &&
       url.pathname.startsWith('/uploads/')

@@ -8,6 +8,7 @@
     "ios": "react-native run-ios",
     "ios:expo": "expo run:ios",
     "lint": "eslint .",
+    "check:connection": "node scripts/check-api-base-url.cjs",
     "start": "react-native start",
     "start:expo": "expo start --web",
     "start:expo:native": "expo start"
@@ -17,6 +18,7 @@
     "@react-native-async-storage/async-storage": "^2.2.0",
     "babel-preset-expo": "~57.0.0",
     "expo": "~57.0.23",
+    "expo-constants": "~57.0.18",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",

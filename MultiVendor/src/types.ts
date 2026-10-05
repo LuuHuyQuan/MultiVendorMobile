@@ -42,6 +42,7 @@ export type Order = {
   itemCount: number;
   status: OrderStatus;
   productIds: string[];
+  productPreviews?: OrderProductPreview[];
   lines?: OrderLine[];
   delivery?: CustomerDetails;
   subtotal?: number;
@@ -50,6 +51,12 @@ export type Order = {
   tax?: number;
   coupon?: string;
   simulated?: boolean;
+};
+
+export type OrderProductPreview = {
+  productId: string | null;
+  name: string;
+  imageUrl: string | null;
 };
 
 export type OrderLine = {

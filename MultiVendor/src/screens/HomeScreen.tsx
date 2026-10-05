@@ -9,19 +9,19 @@ import {
 } from 'react-native';
 
 import { ProductCard, SearchBar } from '../components/SellzyUI';
+import { CategoryImage } from '../components/CategoryImage';
 import { Icon, IconName } from '../components/Icon';
 import { categories, products, sellers } from '../data/catalog';
+import type { LiveCategory } from '../data/liveCatalog';
 import { COLORS } from '../theme';
 import type { Product } from '../types';
-
-type CategoryOption = { id: string; label: string; tint?: string };
 
 type Props = {
   topInset: number;
   cartCount: number;
   wishlistIds: string[];
   catalogProducts?: Product[];
-  catalogCategories?: CategoryOption[];
+  catalogCategories?: LiveCategory[];
   liveCatalog?: boolean;
   onShop: (
     category?: string,
@@ -267,10 +267,9 @@ export default function HomeScreen({
                   { backgroundColor: category.tint ?? COLORS.tealSoft },
                 ]}
               >
-                <Icon
-                  name={categoryIcons[category.id] ?? 'shop'}
-                  size={27}
-                  color={COLORS.tealDark}
+                <CategoryImage
+                  source={category.image}
+                  fallbackIcon={categoryIcons[category.id] ?? 'shop'}
                 />
               </View>
               <Text numberOfLines={2} style={styles.categoryLabel}>
@@ -797,6 +796,7 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },

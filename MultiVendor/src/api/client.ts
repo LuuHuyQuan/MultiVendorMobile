@@ -1,5 +1,7 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+import { resolveApiBaseUrl } from './baseUrl';
 import { ApiError, createApiError, readResponseBody } from './errors';
 import {
   clearSession,
@@ -16,16 +18,14 @@ declare const process: {
   };
 };
 
-const platformBaseUrl = Platform.select({
-  web: '/api',
-  android: 'http://10.0.2.2:5027/api',
-  default: 'http://localhost:5027/api',
+export const API_BASE_URL = resolveApiBaseUrl({
+  platform: Platform.OS,
+  apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL,
+  webApiBaseUrl: process.env.EXPO_PUBLIC_WEB_API_BASE_URL,
+  developmentHost: __DEV__
+    ? Constants.expoConfig?.hostUri || Constants.expoGoConfig?.debuggerHost
+    : undefined,
 });
-
-export const API_BASE_URL = (
-  (Platform.OS === 'web' ? process.env.EXPO_PUBLIC_WEB_API_BASE_URL?.trim() : undefined) ||
-  process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || platformBaseUrl
-).replace(/\/+$/, '');
 
 export interface ApiRequestOptions extends Omit<RequestInit, 'body'> {
   body?: unknown;

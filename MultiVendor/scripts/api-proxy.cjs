@@ -17,7 +17,9 @@ function endToEndHeaders(headers) {
 }
 
 function createApiProxyMiddleware(
-  targetValue = process.env.API_PROXY_TARGET || 'http://127.0.0.1:5027',
+  // Visual Studio's HTTPS profile redirects its HTTP port to a loopback URL.
+  // Connecting to HTTPS here keeps phones on the Metro origin through the proxy.
+  targetValue = process.env.API_PROXY_TARGET?.trim() || 'https://localhost:7226',
   timeoutMs = 30_000,
 ) {
   let target;

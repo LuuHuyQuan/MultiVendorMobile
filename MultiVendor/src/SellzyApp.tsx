@@ -143,6 +143,11 @@ const serverOrderToOrder = (server: CustomerOrderSummary, saved?: Order): Order 
     paymentStatus: server.paymentStatus,
     paymentMethod: server.paymentMethod,
     productIds: saved?.productIds ?? [],
+    productPreviews: server.productPreviews?.map(preview => ({
+      productId: preview.productId === null ? null : String(preview.productId),
+      name: preview.productName,
+      imageUrl: preview.imageUrl,
+    })),
     lines: saved?.lines,
     simulated: false,
   };
@@ -203,7 +208,7 @@ export default function SellzyApp() {
       ]
     : orders;
   const hasDemoCart = Object.keys(cart).some(id => !isRemoteCartId(id));
-  const liveCatalog = remoteCatalog !== null && !hasDemoCart;
+  const liveCatalog = remoteCatalog !== null;
   const activeProducts = liveCatalog ? remoteCatalog.products : products;
   const remoteLines = serverCart?.email === auth.email && auth.isLoggedIn
     ? serverCart.cart.items
@@ -245,6 +250,7 @@ export default function SellzyApp() {
             variantId: line.variantId,
           } satisfies Product];
         }),
+        ...products.filter(product => (cart[product.id] ?? 0) > 0),
       ]
     : products;
   const activeCategories = liveCatalog ? remoteCatalog.categories : categories;
@@ -822,7 +828,8 @@ export default function SellzyApp() {
   const openProduct = (id: string) =>
     push({ name: 'product', productId: baseProductId(id) });
   const toggleWishlist = (id: string) => {
-    if (liveCatalog && auth.isLoggedIn && wishlistReadyAccount.current !== auth.email) {
+    const remoteProduct = liveCatalog && /^\d+$/.test(id);
+    if (remoteProduct && auth.isLoggedIn && wishlistReadyAccount.current !== auth.email) {
       setToast('Đang đồng bộ sản phẩm yêu thích. Vui lòng thử lại.');
       return;
     }
@@ -838,7 +845,7 @@ export default function SellzyApp() {
         ? 'Đã bỏ khỏi danh sách yêu thích.'
         : 'Đã thêm vào danh sách yêu thích.',
     );
-    if (liveCatalog && auth.isLoggedIn) {
+    if (remoteProduct && auth.isLoggedIn) {
       const email = auth.email;
       const productId = Number(baseProductId(id));
       if (!Number.isSafeInteger(productId) || productId < 1) return;
@@ -867,6 +874,9 @@ export default function SellzyApp() {
   };
   const applyCoupon = async (code: string): Promise<boolean> => {
     if (liveCatalog) {
+      if (Object.keys(dataRef.current.cart).some(id => !isRemoteCartId(id))) {
+        throw new Error('Vui lòng xóa sản phẩm mẫu trong giỏ trước khi dùng mã giảm giá trực tuyến.');
+      }
       if (!auth.isLoggedIn || !remoteCatalog) {
         throw new Error('Vui lòng đăng nhập để dùng mã giảm giá.');
       }
@@ -949,6 +959,9 @@ export default function SellzyApp() {
     try {
       let order: Order;
       if (liveCatalog) {
+        if (Object.keys(current.cart).some(id => !isRemoteCartId(id))) {
+          throw new Error('Vui lòng xóa sản phẩm mẫu trong giỏ trước khi đặt hàng trực tuyến.');
+        }
         if (!current.auth.isLoggedIn) {
           throw new Error('Vui lòng đăng nhập để đặt hàng.');
         }
@@ -1382,7 +1395,7 @@ export default function SellzyApp() {
             catalogProducts={cartCatalog}
             liveCatalog={liveCatalog}
             totalsOverride={
-              liveCatalog && serverQuote !== null
+              liveCatalog && !hasDemoCart && serverQuote !== null
                 ? {
                     subtotal: serverQuote.subtotal / 1000,
                     discount: serverQuote.discountTotal / 1000,
@@ -1392,7 +1405,7 @@ export default function SellzyApp() {
                   }
                 : undefined
             }
-            couponCode={liveCatalog ? serverQuote?.couponCode ?? '' : coupon}
+            couponCode={liveCatalog ? (!hasDemoCart ? serverQuote?.couponCode ?? '' : '') : coupon}
             onApplyCoupon={applyCoupon}
             onBack={goBack}
             onCheckout={beginCheckout}
@@ -1417,7 +1430,7 @@ export default function SellzyApp() {
             catalogProducts={cartCatalog}
             liveCatalog={liveCatalog}
             totalsOverride={
-              liveCatalog && serverQuote !== null
+              liveCatalog && !hasDemoCart && serverQuote !== null
                 ? {
                     subtotal: serverQuote.subtotal / 1000,
                     discount: serverQuote.discountTotal / 1000,
@@ -1427,7 +1440,7 @@ export default function SellzyApp() {
                   }
                 : undefined
             }
-            couponCode={liveCatalog ? serverQuote?.couponCode ?? '' : coupon}
+            couponCode={liveCatalog ? (!hasDemoCart ? serverQuote?.couponCode ?? '' : '') : coupon}
             onBack={goBack}
             onPlaceOrder={placeOrder}
             initialDetails={{
@@ -1570,6 +1583,31 @@ export default function SellzyApp() {
       >
         {renderRoute()}
       </View>
+      {!liveCatalog && (route.name === 'home' || route.name === 'shop') ? (
+        <Pressable
+          accessibilityRole="button"
+          disabled={!catalogError}
+          onPress={() => setCatalogAttempt(value => value + 1)}
+          style={styles.catalogWarning}
+        >
+          <Text style={styles.catalogWarningText}>
+            {catalogError
+              ? 'Không tải được sản phẩm từ cửa hàng. Chạm để thử lại.'
+              : 'Đang tải sản phẩm từ cửa hàng…'}
+          </Text>
+        </Pressable>
+      ) : null}
+      {liveCatalog && hasDemoCart && (showBottomNav || route.name === 'cart') ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={openCart}
+          style={styles.catalogWarning}
+        >
+          <Text style={styles.catalogWarningText}>
+            Giỏ còn sản phẩm mẫu đã lưu. Chạm để xem và xóa sản phẩm mẫu trước khi đặt hàng trực tuyến.
+          </Text>
+        </Pressable>
+      ) : null}
       {saveError ? (
         <Pressable
           accessibilityRole="button"

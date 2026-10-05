@@ -23,6 +23,8 @@ import {
   sharedStyles,
 } from '../components/SellzyUI';
 import { categories, products } from '../data/catalog';
+import type { LiveCategory } from '../data/liveCatalog';
+import { CategoryImage } from '../components/CategoryImage';
 import { COLORS, money } from '../theme';
 import { Product, SortMode } from '../types';
 import { Icon } from '../components/Icon';
@@ -34,8 +36,6 @@ const sorts: { id: SortMode; label: string }[] = [
   { id: 'price-desc', label: 'Giá: cao đến thấp' },
   { id: 'discount', label: 'Giảm giá nhiều nhất' },
 ];
-
-type CategoryOption = { id: string; label: string };
 
 const searchable = (value: string) =>
   value
@@ -62,7 +62,7 @@ type ShopProps = CommonProps & {
   initialQuery?: string;
   initialStore?: string;
   initialSort?: SortMode;
-  catalogCategories?: CategoryOption[];
+  catalogCategories?: LiveCategory[];
   canGoBack?: boolean;
   onFiltersChange?: (filters: {
     category: string;
@@ -176,6 +176,11 @@ export function ShopScreen({
               onPress={() => updateFilters({ category: item.id })}
               style={[styles.filterChip, active && styles.filterChipActive]}
             >
+              {item.id !== 'All' ? (
+                <View style={styles.filterImageWrap}>
+                  <CategoryImage source={item.image} iconSize={17} />
+                </View>
+              ) : null}
               <Text
                 style={[styles.filterText, active && styles.filterTextActive]}
               >
@@ -826,9 +831,20 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: COLORS.border,
+    flexDirection: 'row',
+    gap: 7,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.white,
+  },
+  filterImageWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.tealSoft,
   },
   filterChipActive: { borderColor: COLORS.teal, backgroundColor: COLORS.teal },
   filterText: { color: COLORS.muted, fontSize: 12, fontWeight: '700' },

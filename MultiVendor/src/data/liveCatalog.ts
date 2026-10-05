@@ -1,3 +1,5 @@
+import type { ImageSourcePropType } from 'react-native';
+
 import { API_BASE_URL } from '../api/client';
 import { resolveApiImageUrl } from '../api/media';
 import {
@@ -8,7 +10,12 @@ import {
 } from '../api/storefront';
 import type { Product } from '../types';
 
-export type LiveCategory = { id: string; label: string; tint: string };
+export type LiveCategory = {
+  id: string;
+  label: string;
+  tint?: string;
+  image?: ImageSourcePropType;
+};
 
 export type LiveCatalog = {
   products: Product[];
@@ -178,6 +185,9 @@ export async function loadLiveCatalog(signal?: AbortSignal): Promise<LiveCatalog
         id: item.slug,
         label: item.name,
         tint: '#EAF1FF',
+        image: item.imageUrl?.trim()
+          ? { uri: resolveApiImageUrl(item.imageUrl, API_BASE_URL) }
+          : undefined,
       })),
     ],
   };
